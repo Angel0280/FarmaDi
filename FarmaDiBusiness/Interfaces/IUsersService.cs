@@ -14,7 +14,12 @@ namespace FarmaDiBusiness.Interfaces
     {
         Task<ServiceResponse<RolesUers>> RegisterUserWithRolesAsync(RegisterUserRolesDto userDto);
 
-        //Task<ServiceResponse<Users>> GetUSerByNameAsync(string name);
+        Task<ServiceResponse<IEnumerable<GetUsers>>> GetAllAsync();
+        Task<ServiceResponse<GetUsers>> GetByIdAsync(int id);
+
+        Task<ServiceResponse<Users>> GetUSerByNameAsync(string name);
+
+        Task<ServiceResponse<IEnumerable<Roles>>> AssignRoleToUserAsync(int userId, int roleId);
 
     }
 }

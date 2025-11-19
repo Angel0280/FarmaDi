@@ -16,7 +16,7 @@ namespace FarmaDiBusiness.DTOs.UsersDto
         public int RolId { get; set; }
         public bool IsActive { get; set; }
 
-        public List<string> Roles { get; set; }
+        public List<RolesResponseDto> Roles { get; set; }
 
     }
 }

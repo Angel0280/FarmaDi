@@ -9,7 +9,7 @@ namespace FarmaDiBusiness.DTOs.UsersDto
 {
     public class LoginRequestDto
     {
-        [Required, MinLength(6)]
+        [Required, MinLength(5)]
         public string UserName { get; set; }
         [Required, MinLength(6)]
         public string Password { get; set; }

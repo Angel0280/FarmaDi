@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace FarmaDiDataAccess.Repositories
 {
@@ -118,13 +119,17 @@ namespace FarmaDiDataAccess.Repositories
         {
             var users = new List<Users>();
             var response = new RepositoryResponse<IEnumerable<Users>>();
+
+            var userDictionary = new Dictionary<int, Users>();
+
             try
             {
-                // establecemos la conexion con la base de datos
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-                    SqlCommand cmd = new SqlCommand("UspGetAllRoles", connection);
+
+                    // IMPORTANTE: Asegúrate de usar el SP que devuelve DOS selects (Usuarios y luego Roles)
+                    SqlCommand cmd = new SqlCommand("USP_GetAllUsers", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
@@ -132,29 +137,55 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            users.Add(new Users
+                            var user = new Users
                             {
                                 UserId = (int)reader["UserId"],
                                 UserName = reader["UserName"].ToString()!,
                                 UserLastName = reader["UserLastName"].ToString()!,
                                 Mail = reader["Mail"].ToString()!,
                                 UserPhone = reader["UserPhone"].ToString()!,
-                                IsActive = (bool)reader["Isactive"]
-                            });
+                                IsActive = (bool)reader["Isactive"],
+                               
+                                Roles = new List<Roles>()
+                            };
+                            users.Add(user);
+
+                            if (!userDictionary.ContainsKey(user.UserId))
+                            {
+                                userDictionary.Add(user.UserId, user);
+                            }
+                        }
+
+                        await reader.NextResultAsync();
+
+                        while (await reader.ReadAsync())
+                        {
+                            var userIdOwner = (int)reader["UserId"];
+
+                            if (userDictionary.TryGetValue(userIdOwner, out var userOwner))
+                            {
+                               
+                                userOwner.Roles.Add(new Roles
+                                {
+                                    Id = (int)reader["RolId"],
+                                    RolName = reader["RolName"].ToString()!
+                                });
+                            }
                         }
                     }
-                    //Capturando el valor que retorna  el procedimiento almacenado 
+
+                    // Capturando el valor que retorna el procedimiento almacenado 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
 
                     response.Data = users;
                     response.OperationStatusCode = returnedValue;
-
                 }
             }
             catch (SqlException ex)
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message; 
             }
 
             catch (Exception ex)
@@ -166,18 +197,19 @@ namespace FarmaDiDataAccess.Repositories
                     Message = ex.Message
                 };
             }
+
             return response;
         }
 
         public async Task<RepositoryResponse<Users>> GetByIdAsync(int id)
         {
-            Users response = null;
+            var response = new Users();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-                    SqlCommand cmd = new SqlCommand("UspGetRoleById", connection);
+                    SqlCommand cmd = new SqlCommand("USP_GetUserById", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@UserId", id);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
@@ -187,12 +219,26 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.UserId = (int)reader["RolId"];
-                            response.UserName = reader["RolName"].ToString()!;
+                            response.UserId = (int)reader["UserId"];
+                            response.UserName = reader["UserName"].ToString()!;
                             response.UserLastName = reader["UserLastName"].ToString()!;
                             response.Mail = reader["Mail"].ToString()!;
                             response.UserPhone = reader["UserPhone"].ToString()!;
                             response.IsActive = (bool)reader["Isactive"];
+                            
+                        }
+                        if (await reader.NextResultAsync())
+                        {
+                            var rolesList = new List<Roles>();
+                            while (await reader.ReadAsync())
+                            {
+                                rolesList.Add(new Roles
+                                {
+                                    Id = (int)reader["RolId"],
+                                    RolName = reader["RolName"].ToString()!,
+                                });
+                            }
+                            response.Roles = rolesList;
                         }
                     }
 
@@ -426,6 +472,63 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
-        
+        public async Task<RepositoryResponse<IEnumerable<Roles>>> AssignRoleToUserAsync(int userId, int roleId)
+        {
+            var updateRoles = new List<Roles>();
+            var response = new RepositoryResponse<IEnumerable<Roles>>();
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    SqlCommand cmd = new SqlCommand("USP_AsigneRolToUser", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    cmd.Parameters.AddWithValue("@RolId", roleId);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            updateRoles.Add(new Roles
+                            {
+                                Id = (int)reader["RolId"],
+                                RolName = reader["RolName"].ToString()!
+                            });
+                        }
+                    }
+
+                }
+                return new RepositoryResponse<IEnumerable<Roles>>
+                {
+                    Data = updateRoles,
+                    OperationStatusCode = 0,
+                    Message = "Operacion exitosa"
+                };
+            }
+            catch (SqlException ex)
+            {
+                return new RepositoryResponse<IEnumerable<Roles>>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = "EL rol ya esta asignado al usuario."
+                };
+
+            }
+            catch (Exception)
+            {
+                return new RepositoryResponse<IEnumerable<Roles>>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = "ocurrio un error interno"
+                };
+            }
+        }
+
+
+
     }
 }
