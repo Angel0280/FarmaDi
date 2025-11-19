@@ -12,6 +12,6 @@ namespace FarmaDiBusiness.DTOs.UsersDto
         public string UserLastName { get; set; }
         public string Mail { get; set; }
         public string UserPhone { get; set; }
-        public IEnumerable<string> Roles { get; set; }
+        public IEnumerable<RolesResponseDto> Roles { get; set; }
     }
 }

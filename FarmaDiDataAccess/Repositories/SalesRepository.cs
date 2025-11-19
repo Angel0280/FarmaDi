@@ -43,6 +43,7 @@ namespace FarmaDiDataAccess.Repositories
                     detailsTable.Columns.Add("Quantity", typeof(int));
                     detailsTable.Columns.Add("UnitPrice", typeof(decimal));
 
+
                     foreach (var item in details)
                     {
                         detailsTable.Rows.Add(item.ProductId, item.Quantity, item.UnitPrice);
@@ -59,12 +60,12 @@ namespace FarmaDiDataAccess.Repositories
                             trasaction.Sale = new Sale
                             {
                                 SaleId = (int)reader["InvoicesId"],
+                                UserId = (int)reader["UserId"],
                                 ClientName = reader["ClientName"].ToString(),
                                 RegisteredDate = DateOnly.FromDateTime(Convert.ToDateTime(reader["RegisteredDate"])),
-                                SubTotal = (decimal)reader["SubTotal"],
                                 Discount = (decimal)reader["Discount"],
+                                SubTotal = (decimal)reader["SubTotal"],
                                 Total = (decimal)reader["Total"],
-                                UserId = (int)reader["UserId"],
                                 PaymentMethodId = (int)reader["PaymentMethodId"]
                             };
                         }

@@ -21,58 +21,96 @@ namespace FarmaDiDataAccess.Repositories
             _connectionString = configuration.GetConnectionString("DefaultConnection")!;
         }
 
-        public async Task<RepositoryResponse<Users>> AddAsync(Users users)
+        public async Task<RepositoryResponse<RolesUers>> RegisterUserWithRolesAsync(Users user, IEnumerable<Roles> roleIds)
         {
-            var response = new Users();
+
+            var response = new RolesUers();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-                    SqlCommand cmd = new SqlCommand("USP_AddRol", connection);
+                    SqlCommand cmd = new SqlCommand("USP_RegisterUserWithRoles", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@UserName", users.UserName);
-                    cmd.Parameters.AddWithValue("@UserLastName", users.UserLastName);
-                    cmd.Parameters.AddWithValue("@PasswordHash", users.PasswordHash);
-                    cmd.Parameters.AddWithValue("@Mail", users.Mail);
-                    cmd.Parameters.AddWithValue("UserPhone", users.UserPhone);
-                    cmd.Parameters.AddWithValue("IsActive", users.IsActive);
-                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
+                    cmd.Parameters.AddWithValue("@UserName", user.UserName);
+                    cmd.Parameters.AddWithValue("@UserLastName", user.UserLastName);
+                    cmd.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+                    cmd.Parameters.AddWithValue("@Mail", user.Mail);
+                    cmd.Parameters.AddWithValue("UserPhone", user.UserPhone);
+                    // Crear un DataTable para los IDs de roles
+                    var roleIdsTable = new DataTable();
+                    roleIdsTable.Columns.Add("RollId", typeof(int));
+                    // Llenar el DataTable con los IDs de roles
+                    foreach (var items in roleIds)
+                    {
+                        roleIdsTable.Rows.Add(items.Id);
+                    }
 
+                    // Agregar el parámetro de tabla para los IDs de roles
+                    SqlParameter rolParam = cmd.Parameters.AddWithValue("@Roles", roleIdsTable);
+                    rolParam.SqlDbType = SqlDbType.Structured;
+                    rolParam.TypeName = "TipoListaRoles";
+                    //cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.UserName = reader["UserName"].ToString()!;
-                            response.UserLastName = reader["UserLastName"].ToString()!;
-                            response.PasswordHash = reader["UserPassword"].ToString()!;
-                            response.Mail = reader["Mail"].ToString()!;
-                            response.UserPhone = reader["UserPhone"].ToString()!;
-                            response.IsActive = (bool)reader["Isactive"];
+                            response.Users = new Users
+                            {
+                                UserId = (int)reader["UserId"],
+                                UserName = reader["UserName"].ToString()!,
+                                UserLastName = reader["UserLastName"].ToString()!,
+                                Mail = reader["Mail"].ToString()!,
+                                UserPhone = reader["UserPhone"].ToString()!,
+                                IsActive = (bool)reader["Isactive"]
+
+                            };
                         }
+
+                        await reader.NextResultAsync();
+                        //Creamos un objeto de tipo Lista para almacenar los roles asociados al usuario
+                        var rolesList = new List<Roles>();
+                        while (await reader.ReadAsync())
+                        {
+                            rolesList.Add(new Roles
+                            {
+                                Id = (int)reader["RolId"],
+                                RolName = reader["RolName"].ToString()!,
+
+                            });
+                        }
+
+                        response.Roles = rolesList;
+
                     }
 
-                    // capturamos el código que viene del procedimiento 
-                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-                    return new RepositoryResponse<Users>
+                    return new RepositoryResponse<RolesUers>
                     {
                         Data = response,
-                        OperationStatusCode = returnedValue
-
+                        OperationStatusCode = 0,
+                        Message = "Operacion exitosa"
                     };
                 }
             }
             catch (SqlException ex)
             {
-                return new RepositoryResponse<Users>
+                return new RepositoryResponse<RolesUers>
                 {
                     Data = null,
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
-
                 };
+            }
 
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<RolesUers>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
             }
         }
 
@@ -238,49 +276,7 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<Users>> GetByNameAsync(string name)
-        {
-            Users user = null;
-            var response = new RepositoryResponse<Users>();
-
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    await connection.OpenAsync();
-                    SqlCommand cmd = new SqlCommand("USP_GetRolByName", connection);
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@UserName", name);
-                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
-
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            user.UserId = (int)reader["UserId"];
-                            user.UserName = reader["UserName"].ToString()!;
-                            user.UserLastName = reader["UserLastName"].ToString()!;
-                            user.Mail = reader["Mail"].ToString()!;
-                            user.UserPhone = reader["UserPhone"].ToString()!;
-                            user.IsActive = (bool)reader["Isactive"];
-                        }
-                    }
-
-                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = user;
-                    response.OperationStatusCode = returnedValue;
-
-                    return response;
-                }
-            }
-            catch (SqlException ex)
-            {
-                response.Data = null;
-                response.OperationStatusCode = ex.Number;
-                return response;
-            }
-        }
+        
 
         public async Task<RepositoryResponse<Users>> GetByUserNameAsync(string name)
         {
@@ -430,97 +426,6 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
-        public async Task<RepositoryResponse<RolesUers>> RegisterUserWithRolesAsync(Users user, IEnumerable<Roles> roleIds)
-        {
-
-            var response = new RolesUers();
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    await connection.OpenAsync();
-                    SqlCommand cmd = new SqlCommand("USP_RegisterUserWithRoles", connection);
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@UserName", user.UserName);
-                    cmd.Parameters.AddWithValue("@UserLastName", user.UserLastName);
-                    cmd.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
-                    cmd.Parameters.AddWithValue("@Mail", user.Mail);
-                    cmd.Parameters.AddWithValue("UserPhone", user.UserPhone);
-                    cmd.Parameters.AddWithValue("IsActive", user.IsActive);
-                    // Crear un DataTable para los IDs de roles
-                    var roleIdsTable = new DataTable();
-                    roleIdsTable.Columns.Add("RollId", typeof(int));
-                    // Llenar el DataTable con los IDs de roles
-                    foreach (var items in roleIds)
-                    {
-                        roleIdsTable.Rows.Add(items.Id);
-                    }
-
-                    // Agregar el parámetro de tabla para los IDs de roles
-                    SqlParameter rolParam = cmd.Parameters.AddWithValue("@Roles", roleIdsTable);
-                    rolParam.SqlDbType = SqlDbType.Structured;
-                    rolParam.TypeName = "TipoListaRoles";
-                    //cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
-
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            response.Users = new Users {
-                                UserId = (int)reader["UserId"],
-                                UserName = reader["UserName"].ToString()!,
-                                UserLastName = reader["UserLastName"].ToString()!,
-                                Mail = reader["Mail"].ToString()!,
-                                UserPhone = reader["UserPhone"].ToString()!,
-                                IsActive = (bool)reader["Isactive"]
-
-                            };
-                        }
-
-                        await reader.NextResultAsync();
-                        //Creamos un objeto de tipo Lista para almacenar los roles asociados al usuario
-                        var rolesList = new List<Roles>();
-                        while (await reader.ReadAsync())
-                        {
-                            rolesList.Add(new Roles
-                            {
-                                Id = (int)reader["RolId"],
-                                RolName = reader["RolName"].ToString()!,
-                                
-                            });
-                        }
-
-                        response.Roles = rolesList;
-
-                    }
-
-                    return new RepositoryResponse<RolesUers>
-                    {
-                        Data = response,
-                        OperationStatusCode = 0,
-                        Message = "Operacion exitosa"
-                    };
-                } 
-            }
-            catch (SqlException ex)
-            {
-                return new RepositoryResponse<RolesUers>
-                {
-                    Data = null,
-                    OperationStatusCode = ex.Number,
-                    Message = ex.Message
-                };
-            }
-
-            catch (Exception ex)
-            {
-                return new RepositoryResponse<RolesUers>
-                {
-                    Data = null,
-                    OperationStatusCode = -1,
-                    Message = ex.Message
-                };
-            }
-        }
+        
     }
 }

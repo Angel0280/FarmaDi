@@ -28,7 +28,7 @@ namespace FarmaDiBusiness.Services
             try
             {
 
-                var existingNameUser = await _userRepository.GetByNameAsync(userDto.UserName);
+                /*var existingNameUser = await _userRepository.GetByUserNameAsync(userDto.UserName);
                 if (existingNameUser.Data != null)
                 {
                     return new ServiceResponse<RolesUers>
@@ -49,24 +49,26 @@ namespace FarmaDiBusiness.Services
                         MessageCode = MessageCodes.Conflict,
                         Message = "El correo electrónico ya está en uso."
                     };
-                }
-                var existingRol = await _rolesRepository.GetByIdAsync(userDto.RolesIds.First().IdRoles);
-                if (existingRol.Data == null)
+                }*/
+                foreach (var roleDto in userDto.RolesIds)
                 {
-                    return new ServiceResponse<RolesUers>
+                var existingRol = await _rolesRepository.GetByIdAsync(roleDto.IdRoles);
+                    if (existingRol.Data == null)
                     {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.NotFound,
-                        Message = "El rol especificado no existe."
-                    };
+                        return new ServiceResponse<RolesUers>
+                        {
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NotFound,
+                            Message = $"El rol con ID {roleDto.IdRoles} no existe."
+                        };
+                    }
                 }
 
                 var newUser = new Users
                 {
                     UserName = userDto.UserName,
                     UserLastName = userDto.UserLastName,
-                    PasswordHash = userDto.Password,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password),
                     Mail = userDto.Mail,
                     UserPhone = userDto.UserPhone
                 };
@@ -117,7 +119,7 @@ namespace FarmaDiBusiness.Services
         
         public async Task<ServiceResponse<Users>> GetUSerByNameAsync(string name)
         {
-            var result = await _userRepository.GetByNameAsync(name);
+            var result = await _userRepository.GetByUserNameAsync(name);
             if (result.OperationStatusCode == 0)
             {
                 return new ServiceResponse<Users>

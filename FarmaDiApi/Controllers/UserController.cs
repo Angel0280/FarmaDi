@@ -32,7 +32,7 @@ namespace FarmaDiApi.Controllers
                 dataResponse.Mail = serviceResponse.Data.Users.Mail;
                 dataResponse.UserPhone = serviceResponse.Data.Users.UserPhone;
 
-                dataResponse.Roles = (IEnumerable<string>)serviceResponse.Data!.Roles.Select(dt => new RolesResponseDto
+                dataResponse.Roles = serviceResponse.Data!.Roles.Select(dt => new RolesResponseDto
                 {
                     RolId = dt.Id,
                     RolName = dt.RolName

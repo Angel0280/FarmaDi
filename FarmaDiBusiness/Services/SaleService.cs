@@ -68,13 +68,14 @@ namespace FarmaDiBusiness.Services
                     }
                 }
                 //Mapeo del Maestro de la venta
-                var saleMaster = new Sale { 
+                var saleMaster = new Sale
+                {
                     ClientName = dto.ClientName,
                     UserId = dto.UserId,
                     RegisteredDate = DateOnly.FromDateTime(DateTime.Now),
-                    SubTotal = 0,
                     Discount = 0,
-
+                    SubTotal = 0,
+                    PaymentMethodId = dto.PaymentMethodId
 
                 };
                 //Mapeo del Detalle de la venta
@@ -104,12 +105,12 @@ namespace FarmaDiBusiness.Services
                     dataResponse.Discount = repoResponse.Data!.Sale.Discount;
                     dataResponse.TotalAmount = repoResponse.Data!.Sale.Total;
                     dataResponse.PaymethMethodId = repoResponse.Data!.Sale.PaymentMethodId;
+
                     dataResponse.Details = repoResponse.Data!.SaleDetailsList.Select(d => new SalesDetailsResponseDto
                     {
                         ProductId = d.ProductId,
                         Quantity = d.Quantity,
-                        UnitPrice = d.UnitPrice,
-                        TotalPrice = d.SubTotal
+                        UnitPrice = d.UnitPrice
                     }).ToList();
 
                     return new ServiceResponse<SaleResponseDto>

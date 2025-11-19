@@ -16,6 +16,10 @@ namespace FarmaDiBusiness.DTOs.SaleDto
         [Required(ErrorMessage = "El nombre del cliente es obligatorio")]
         public string ClientName { get; set; }
 
+        public int PaymentMethodId { get; set; }
+
+        public decimal Discount { get; set; }
+
         [Required(ErrorMessage = "Por lo menos debe de haber un producto en la compra.")]
         
         public List<CreateSaleDetailDto> Details { get; set; }
