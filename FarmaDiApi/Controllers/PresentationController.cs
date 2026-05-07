@@ -104,12 +104,15 @@ namespace FarmaDiApi.Controllers
 
             switch (serviceResponse.MessageCode)
             {
+                
                 case MessageCodes.NoData:
                     unsuccessfulResponse.Code = "200";
                     unsuccessfulResponse.Message = "No se encontraron registros";
                     unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
 
                     return Ok(unsuccessfulResponse);
+
+
 
                 default:
                     unsuccessfulResponse.Code = "500";

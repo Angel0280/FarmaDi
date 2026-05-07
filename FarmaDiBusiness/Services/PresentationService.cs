@@ -22,9 +22,6 @@ namespace FarmaDiBusiness.Services
             _presentationRepository = presentationRepository;
         }
 
-
-
-
         public async Task<ServiceResponse<Presentations>> AddAsync(AddPresentationDto newpresentation)
         {
 
