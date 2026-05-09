@@ -129,6 +129,16 @@ builder.Services.AddScoped<ISalesRepository, SalesRepository>();
 builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<IUsersRepository, UsersRepository>();
 
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("PermitirFrontend", policy =>
+    {
+        policy.AllowAnyOrigin()    // Permite que tu LiveServer (puerto 5500) se conecte
+              .AllowAnyHeader()    // Permite que se envíe contenido JSON
+              .AllowAnyMethod();   // Permite usar POST, GET, PUT, etc.
+    });
+});
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -140,7 +150,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-//app.UseAuthentication();
+app.UseAuthentication();
+app.UseCors("PermitirFrontend");
 
 app.UseAuthorization();
 
