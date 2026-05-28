@@ -36,7 +36,7 @@ namespace FarmaDiBusiness.Services
         {
             try
             {
-                // --- (Validación de FKs (Categoría, Presentación, Proveedor, Marca) sin cambios, está correcta) ---
+                
                 var existCategory = await _CategoryService.GetByIdAsync(newproduct.CategoryId);
                 if (existCategory.Data == null)
                 {
@@ -59,7 +59,7 @@ namespace FarmaDiBusiness.Services
                         Message = $"no existe una presentación que coincida con el id {newproduct.PresentationId}"
                     };
                 }
-                // ... (Omitido para brevedad - las otras 2 validaciones de FK están bien) ...
+                
                 var existSupplier = await _SupplierService.GetByIdAsync(newproduct.SupplierId);
                 if (existSupplier.Data == null)
                 {
@@ -71,16 +71,10 @@ namespace FarmaDiBusiness.Services
                     return new ServiceResponse<Products> { /* ... */ };
                 }
 
-                // --- Validación de duplicados ---
-
-                // <-- CORRECCIÓN: Error Crítico de Nulidad
-                // El código original (existing.Data!.ProductId != 0) causaría un NullReferenceException
-                // si GetByNameAsync devuelve un 'Data = null' (porque no encontró el producto).
-                // La lógica correcta es: si la operación fue exitosa (StatusCode 0), significa que
-                // SÍ encontró un producto, y por lo tanto es un duplicado.
+                
                 var existing = await _productRepository.GetByNameAsync(newproduct.GenericName);
 
-                if (existing.OperationStatusCode == 0) // 0 = Éxito (Significa que SÍ lo encontró)
+                if (existing.OperationStatusCode == 0)
                 {
                     return new ServiceResponse<Products>
                     {
@@ -113,9 +107,9 @@ namespace FarmaDiBusiness.Services
                     Message = "Producto registrado correctamente"
                 };
             }
-            catch (Exception ex) // <-- CORRECCIÓN: Buena práctica capturar 'ex' para logging
+            catch (Exception ex) 
             {
-                // TODO: Registrar el error (ex.Message) en un sistema de logs
+                
                 return new ServiceResponse<Products>
                 {
                     Data = null,
@@ -126,7 +120,6 @@ namespace FarmaDiBusiness.Services
             }
         }
 
-        // <-- (El método GetAllAsync() está bien implementado, sin cambios) -->
         public async Task<ServiceResponse<IEnumerable<Products>>> GetAllAsync()
         {
             var result = await _productRepository.GetAllAsync();
@@ -141,7 +134,6 @@ namespace FarmaDiBusiness.Services
                     Message = "Operacion exitosa"
                 };
             }
-            // ... (El switch está bien) ...
             switch (result.OperationStatusCode)
             {
                 case 50009:
@@ -182,13 +174,12 @@ namespace FarmaDiBusiness.Services
                 }
                 switch (result.OperationStatusCode)
                 {
-                    case 50009: // Ejemplo: código para no encontrado
+                    case 50009: 
                         return new ServiceResponse<Products>
                         {
                             Data = null,
                             IsSuccess = false,
                             MessageCode = MessageCodes.NotFound,
-                            // <-- CORRECCIÓN: Typo "no existe no existe"
                             Message = "El producto no existe"
                         };
                     default:
@@ -201,15 +192,13 @@ namespace FarmaDiBusiness.Services
                         };
                 }
             }
-            catch (Exception ex) // <-- CORRECCIÓN: Capturar 'ex'
+            catch (Exception ex) 
             {
-                // TODO: Registrar el error (ex.Message) en un sistema de logs
                 return new ServiceResponse<Products>
                 {
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    // <-- CORRECCIÓN: 'result' no está en el ámbito (scope) del catch.
                     Message = "Ocurrió un error inesperado"
                 };
             }
@@ -219,33 +208,18 @@ namespace FarmaDiBusiness.Services
         {
             try
             {
-                // --- (Validación de FKs (Categoría, Presentación, Proveedor, Marca) sin cambios, está correcta) ---
-                // ... (Omitido para brevedad) ...
-
-                // --- Validación de existencia ---
-
-                // <-- CORRECCIÓN: Error Crítico de Nulidad (Mismo caso que en AddAsync)
-                // La lógica debe ser: si el 'OperationStatusCode' NO es 0, significa que no se encontró.
                 var existingId = await _productRepository.GetByIdAsync(id);
-                if (existingId.OperationStatusCode != 0) // 0 = Éxito (Lo encontró)
+                if (existingId.OperationStatusCode != 0) 
                 {
                     return new ServiceResponse<Products>
                     {
                         Data = null,
                         IsSuccess = false,
-                        MessageCode = MessageCodes.NotFound, // <-- Más específico que ErrorValidation
+                        MessageCode = MessageCodes.NotFound, 
                         Message = "No existe un producto asociado al Id proporcionado"
                     };
                 }
 
-
-                // --- Validación de duplicados (al actualizar) ---
-
-                // <-- CORRECCIÓN: Error Crítico de Nulidad (Mismo caso que en AddAsync)
-                // La lógica es:
-                // 1. Buscar si existe otro producto con el nuevo nombre.
-                // 2. Si SÍ existe (StatusCode 0) Y el ID de ese producto NO es el ID que estamos actualizando,
-                //    entonces es un conflicto.
                 var existingName = await _productRepository.GetByNameAsync(Products.GenericName);
                 if (existingName.OperationStatusCode == 0 && existingName.Data.ProductId != id)
                 {
@@ -277,13 +251,11 @@ namespace FarmaDiBusiness.Services
                     Data = result.Data,
                     IsSuccess = true,
                     MessageCode = MessageCodes.Success,
-                    // <-- CORRECCIÓN: Typo (Decía "Marca actualizada")
                     Message = "Producto actualizado correctamente"
                 };
             }
-            catch (Exception ex) // <-- CORRECCIÓN: Capturar 'ex'
+            catch (Exception ex)
             {
-                // TODO: Registrar el error (ex.Message) en un sistema de logs
                 return new ServiceResponse<Products>
                 {
                     Data = null,
@@ -294,10 +266,8 @@ namespace FarmaDiBusiness.Services
             }
         }
 
-        // <-- (El método GetByNameAsync() está bien implementado, sin cambios) -->
         public async Task<ServiceResponse<Products>> GetByNameAsync(string name)
         {
-            // ... (Este método está bien) ...
             var result = await _productRepository.GetByNameAsync(name);
             if (result.OperationStatusCode == 0)
             {
@@ -339,39 +309,73 @@ namespace FarmaDiBusiness.Services
         {
             var response = new ServiceResponse<Products>();
 
-            // <-- CORRECCIÓN: Error Lógico. 'existing' es un RepositoryResponse, no la entidad.
-            // No se debe comparar 'existing == null', sino su 'OperationStatusCode' o 'Data'.
+            
             var existing = await _productRepository.GetByIdAsync(id);
-            if (existing.OperationStatusCode != 0) // 0 = Éxito (Lo encontró)
+            if (existing.OperationStatusCode != 0)
             {
                 response.Data = null;
                 response.IsSuccess = false;
-                response.MessageCode = MessageCodes.NotFound; // <-- Más específico
+                response.MessageCode = MessageCodes.NotFound; 
                 response.Message = "El producto no existe";
                 return response;
             }
 
-            // Llamar al repositorio para actualizar el estado
+           
             var repoResponse = await _productRepository.SetStateAsync(id, state);
 
-            // <-- CORRECCIÓN: Es mejor comprobar el StatusCode que 'Data == null'
+            
             if (repoResponse.OperationStatusCode != 0)
             {
                 response.Data = null;
                 response.IsSuccess = false;
-                // Usar el código de error apropiado (NotFound si es 50009, sino ErrorDB)
+              
                 response.MessageCode = (repoResponse.OperationStatusCode == 50009) ? MessageCodes.NotFound : MessageCodes.ErrorDataBase;
                 response.Message = repoResponse.Message ?? "No se pudo actualizar el estado del producto";
                 return response;
             }
 
-            // Construir la respuesta exitosa
             response.Data = repoResponse.Data;
             response.IsSuccess = true;
             response.MessageCode = MessageCodes.Success;
             response.Message = state ? "Producto activado" : "Producto desactivado";
 
             return response;
+        }
+
+        public async Task<ServiceResponse<(IEnumerable<Products> Items, int TotalCount)>> GetProductsPagedAsync(int page, int limit)
+        {
+            var result = await _productRepository.GetProductsPagedAsync(page, limit);
+            if (result.OperationStatusCode == 0)
+            {
+                return new ServiceResponse<(IEnumerable<Products> Items, int TotalCount)>()
+                {
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Operación exitosa"
+                };
+            }
+            var messageCode = new MessageCodes();
+            var message = string.Empty;
+            switch (result.OperationStatusCode)
+            {
+                case 50009:
+                    messageCode = MessageCodes.NotFound;
+                    message = "No se encontraron productos para la página solicitada";
+                    break;
+                default:
+                    messageCode = MessageCodes.ErrorDataBase;
+                    message = "Error en la base de datos al obtener los productos paginados.";
+                    break;
+            }
+            return new ServiceResponse<(IEnumerable<Products> Items, int TotalCount)>
+            {
+                Data = (null, 0),
+                IsSuccess = false,
+                MessageCode = messageCode,
+                Message = message
+            };
+
         }
     }
 }

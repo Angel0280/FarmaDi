@@ -327,7 +327,6 @@ namespace FarmaDiApi.Controllers
         [HttpPatch("{id}/state")]
         public async Task<IActionResult> SetStateAsync(int id, [FromQuery] bool state)
         {
-            // Llama al servicio que maneja la lógica de activación/desactivación
             var serviceResponse = await _ProductService.SetStateAsync(id, state);
 
             if (serviceResponse.IsSuccess)
@@ -335,17 +334,6 @@ namespace FarmaDiApi.Controllers
              
                 return Ok(new
                 {
-
-                    //  en este mapeo usamos  el atributo de la clase y no el objeto temporalmete, porque asi lo hicimos en el repo
-                    // en los otros metodos mapeamos el objeto de la clase accediendo a atributos de otras clases por ejemplo
-                    // en el caso de Category en la entidad creamos un objeto de category llamado oCategory para poder acceder a su nombre
-                    // esto no es necesario e incluso si no se usa adecuadamente podria causar errores, tener en cuenta eso, 
-                    // no estoy seguro si aqui se deba pasar el nombre o campos de otras clases además de simplemente su id
-                    // es por eso que dejo estp temporar para fines de prueba 
-
-                    // si se tendria que devolver en la respuesta otros capos por decir el nombre de la categoria en el repositorio
-                    // se cambiaria  CategoryId =(int) reader["CategoryId"], por Ocategory = new Categories {categoryId =(int) reader["CategoryId"], tambien su nombre o campos nesesarios}
-                    // se accede al los capos del objeto de la clase categoria.... nota
                     ProductId = serviceResponse.Data!.ProductId,
                     GenericName = serviceResponse.Data!.GenericName,
                     TradeName = serviceResponse.Data!.TradeName,
@@ -363,7 +351,6 @@ namespace FarmaDiApi.Controllers
                 });
             }
 
-            // Devuelve error si no se encontró la categoría o hubo problema
             var unSuccessfulResponse = new UnsuccessfulResponseDto();
 
             switch (serviceResponse.MessageCode)
@@ -380,6 +367,71 @@ namespace FarmaDiApi.Controllers
                     unSuccessfulResponse.Message = "Ocurrió un error inesperado";
                     unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
                     return StatusCode(500, unSuccessfulResponse);
+            }
+        }
+
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int limit = 10)
+        {
+            if (page <= 0) page = 1;
+            if (limit <= 0) limit = 10;
+            if (limit > 100) limit = 100; 
+
+            var serviceResponse = await _ProductService.GetProductsPagedAsync(page, limit);
+
+            if (serviceResponse.IsSuccess)
+            {
+                var (products, totalCount) = serviceResponse.Data;
+
+                var ProductsDtoCollection = products.Select(c => new GetAllProductsDto
+                {
+                    ProductId = c.ProductId,
+                    GenericName = c.GenericName,
+                    TradeName = c.TradeName,
+                    CategoryId = c.oCategory.CategoryId,
+                    CategoryName = c.oCategory.CategoryName,
+                    PresentationId = c.oPresentation.Id,
+                    PresentationName = c.oPresentation.Description,
+                    ConcentrationId = c.oconcentration.ConcentrationId,
+                    Porcentage = c.oconcentration.ConcentrationName,
+                    SupplierId = c.oSupplier.SupplierId,
+                    SupplierName = c.oSupplier.SupplierName,
+                    BrandId = c.obrand.BrandId,
+                    BrandName = c.obrand.BrandName,
+                    IsActive = c.IsActive
+                }).ToList();
+
+                int totalPages = (int)Math.Ceiling(totalCount / (double)limit);
+
+                var apiResponse = new ApiResponse<IEnumerable<GetAllProductsDto>>
+                {
+                    Data = ProductsDtoCollection,
+                    Meta = new GetProductPagedDTO
+                    {
+                        TotalItems = totalCount,
+                        TotalPages = totalPages,
+                        CurrentPage = page,
+                        ItemsPerPage = limit
+                    }
+                };
+                return Ok(apiResponse);
+            }
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
+
+            switch (serviceResponse.MessageCode)
+            {
+                case MessageCodes.NoData:
+                    unsuccessfulResponse.Code = "200";
+                    unsuccessfulResponse.Message = "No se encontraron registros";
+                    unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
+                    return Ok(unsuccessfulResponse);
+
+                default:
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
     }

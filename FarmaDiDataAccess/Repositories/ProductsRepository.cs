@@ -378,6 +378,78 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
+        public async Task<RepositoryResponse<(IEnumerable<Products> Items, int TotalCount)>> GetProductsPagedAsync(int page, int limit)
+        {
+            var products = new List<Products>();
+            var response = new RepositoryResponse<(IEnumerable<Products> Items, int TotalCount)>();
+            int totalRecords = 0;
 
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    SqlCommand cmd = new SqlCommand("USP_GetProductsPaged", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    // Parámetros de entrada
+                    cmd.Parameters.AddWithValue("@PageNumber", page);
+                    cmd.Parameters.AddWithValue("@PageSize", limit);
+
+                    // Parámetro de salida para recuperar el total de registros
+                    SqlParameter totalRecordsParam = new SqlParameter("@TotalRecords", SqlDbType.Int);
+                    totalRecordsParam.Direction = ParameterDirection.Output;
+                    cmd.Parameters.Add(totalRecordsParam);
+
+                    // Tu ReturnValue clásico
+                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            // Exactamente el mismo mapeo que ya tienes en USP_GetAllProducts
+                            products.Add(new Products
+                            {
+                                ProductId = (int)reader["ProductId"],
+                                GenericName = reader["ProductGenericName"].ToString()!,
+                                TradeName = reader["ProductTradeName"].ToString(),
+                                oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString() },
+                                oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString() },
+                                oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], ConcentrationName = reader["Porcentage"].ToString() },
+                                oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString() },
+                                obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString() },
+                                IsActive = (bool)reader["IsActive"]
+                            });
+                        }
+                    }
+
+                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
+
+                    if (totalRecordsParam.Value != DBNull.Value)
+                    {
+                        totalRecords = Convert.ToInt32(totalRecordsParam.Value);
+                    }
+
+                    response.Data = (products, totalRecords);
+                    response.OperationStatusCode = returnedValue;
+                }
+            }
+            catch (SqlException ex)
+            {
+                response.Data = (new List<Products>(), 0);
+                response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                response.Data = (new List<Products>(), 0);
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
+            }
+
+            return response;
+
+        }
     }
 }

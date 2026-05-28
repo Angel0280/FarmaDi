@@ -24,7 +24,6 @@ namespace FarmaDiBusiness.DTOs.ProductDto
    
         public int ConcentrationId { get; set; }
        
-        //public string Volume {  get; set; }
         public string Porcentage { get; set; }
       
         public int SupplierId { get; set; }
