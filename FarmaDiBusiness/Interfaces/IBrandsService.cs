@@ -17,5 +17,6 @@ namespace FarmaDiBusiness.Interfaces
         Task<ServiceResponse<Brands>> UpdateAsync(int id, UpdateBrandDto brand);
         Task<ServiceResponse<Brands>> GetByNameAsync(string name);
         Task<ServiceResponse<Brands>> SetStateAsync(int id, bool state);
+        Task<ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>> GetBrandsPagedAsync(int page, int limit);
     }
 }

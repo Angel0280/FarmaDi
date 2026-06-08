@@ -26,5 +26,8 @@ namespace FarmaDiDataAccess.Interfaces
 
         // firma para asignar el estado de un registro en catalogo(establecer estado)
         Task<RepositoryResponse<Categories>> SetStateAsync(int id, bool state);
+
+        // firma para la paginacionde categorias
+        Task<RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>> GetCategoriesPagedAsync(int pageNumber, int pageSize);
     }
 }

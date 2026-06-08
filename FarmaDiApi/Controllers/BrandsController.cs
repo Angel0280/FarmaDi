@@ -1,4 +1,5 @@
 ﻿using FarmaDiBusiness.DTOs;
+using FarmaDiBusiness.DTOs.ProductDto;
 using FarmaDiBusiness.Interfaces;
 using FarmaDiBusiness.Services;
 using FarmaDiCore.Common;
@@ -308,6 +309,59 @@ namespace FarmaDiApi.Controllers
                     unSuccessfulResponse.Message = "Ocurrió un error inesperado";
                     unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
                     return StatusCode(500, unSuccessfulResponse);
+            }
+        }
+
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int limit = 10)
+        {
+            if (page <= 0) page = 1;
+            if (limit <= 0) limit = 10;
+            if (limit > 100) limit = 100;
+
+            var serviceResponse = await _brandsService.GetBrandsPagedAsync(page, limit);
+            if (serviceResponse.IsSuccess)
+            {
+                var (brands, totalCount) = serviceResponse.Data;
+                var BrandsCollection = brands.Select(c => new GetAllBrandsDto
+                {
+                    BrandId = c.BrandId,
+                    BrandName = c.BrandName,
+                    BrandDescription = c.Description,
+                    IsActive = c.IsActive
+                }).ToList();
+
+                int totalPages = (int)Math.Ceiling(totalCount / (double)limit);
+
+                var apiResponse = new ApiResponse<IEnumerable<GetAllBrandsDto>>
+                {
+                    Data = BrandsCollection,
+                    Meta = new GetBrandsPagedDto
+                    {
+                        TotalItems = totalCount,
+                        TotalPages = totalPages,
+                        CurrentPage = page,
+                        ItemsPerPage = limit
+                    }
+                };
+                return Ok(apiResponse);
+            }
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
+
+            switch (serviceResponse.MessageCode)
+            {
+                case MessageCodes.NoData:
+                    unsuccessfulResponse.Code = "200";
+                    unsuccessfulResponse.Message = "No se encontraron registros";
+                    unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
+                    return Ok(unsuccessfulResponse);
+
+                default:
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
     }

@@ -29,22 +29,22 @@ namespace FarmaDiBusiness.Services
 
             try
             {
-                 //validar si existe registro (una marca) con nombre similar al que se desea crear
-                  var existing = await _brandRepository.GetByNameAsync(newbrand.BrandName);
+                //validar si existe registro (una marca) con nombre similar al que se desea crear
+                var existing = await _brandRepository.GetByNameAsync(newbrand.BrandName);
 
                 if (existing.Data!.BrandId != 0 && !existing.Data.BrandName.IsNullOrEmpty())
-                 {
-                     return new ServiceResponse<Brands>
-                     {
-                         Data = null,
-                         IsSuccess = false, ///.//
-                         MessageCode = MessageCodes.Conflict ,
-                         Message = "Existe un registro con el nombre proporcionado"
+                {
+                    return new ServiceResponse<Brands>
+                    {
+                        Data = null,
+                        IsSuccess = false, ///.//
+                        MessageCode = MessageCodes.Conflict,
+                        Message = "Existe un registro con el nombre proporcionado"
 
-                     };
+                    };
 
-                 }
-                
+                }
+
 
                 var brand = new Brands()
                 {
@@ -211,15 +211,15 @@ namespace FarmaDiBusiness.Services
                 };
 
                 var result = await _brandRepository.UpdateAsync(id, dataBrand);
-                
-                    return new ServiceResponse<Brands>
-                    {
-                        Data = result.Data,
-                        IsSuccess = true,
-                        MessageCode = MessageCodes.Success,
-                        Message = "Marca actualizada correctamente"
-                    };
-               
+
+                return new ServiceResponse<Brands>
+                {
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Marca actualizada correctamente"
+                };
+
 
             }
             catch (Exception)
@@ -314,10 +314,41 @@ namespace FarmaDiBusiness.Services
             return response;
         }
 
+        public async Task<ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>> GetBrandsPagedAsync(int page, int limit)
+        {
+            var result = await _brandRepository.GetBrandsPagedAsync(page, limit);
+            if (result.OperationStatusCode == 0)
+            {
+                return new ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>()
+                {
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Operación exitosa"
+                };
+            }
+            var messageCode = new MessageCodes();
+            var message = string.Empty;
+            switch (result.OperationStatusCode)
+            {
+                case 50009:
+                    messageCode = MessageCodes.NotFound;
+                    message = "No se encontraron marcas para la página solicitada";
+                    break;
+                default:
+                    messageCode = MessageCodes.ErrorDataBase;
+                    message = "Error en la base de datos al obtener las marcas.";
+                    break;
+            }
+            return new ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>
+            {
+                Data = (null, 0),
+                IsSuccess = false,
+                MessageCode = messageCode,
+                Message = message
+            };
+
+        }
     }
-
-
-
-
 }
 

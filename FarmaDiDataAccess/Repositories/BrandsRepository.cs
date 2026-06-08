@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
-    public class BrandsRepository :IBrandsRepository
+    public class BrandsRepository : IBrandsRepository
     {
         private readonly string _connectionString;
         public BrandsRepository(IConfiguration configuration)
@@ -31,7 +31,7 @@ namespace FarmaDiDataAccess.Repositories
                 {
                     await connection.OpenAsync();
                     SqlCommand cmd = new SqlCommand("Usp_AddBrand", connection);
-                      cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.CommandType = CommandType.StoredProcedure;
 
                     cmd.Parameters.AddWithValue("@BrandName", brand.BrandName);
                     cmd.Parameters.AddWithValue("@BrandDescription", brand.Description);
@@ -74,7 +74,7 @@ namespace FarmaDiDataAccess.Repositories
                 };
 
             }
-        }      
+        }
 
 
         // aqui mandamos a llamar todos los registros existentes en "marcas", si no hay registros
@@ -160,7 +160,7 @@ namespace FarmaDiDataAccess.Repositories
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-              
+
 
                     return new RepositoryResponse<Brands>
                     {
@@ -184,7 +184,7 @@ namespace FarmaDiDataAccess.Repositories
 
 
         public async Task<RepositoryResponse<Brands>> UpdateAsync(int id, Brands brands)
-        {            
+        {
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -192,14 +192,14 @@ namespace FarmaDiDataAccess.Repositories
                     await connection.OpenAsync();
                     SqlCommand cmd = new SqlCommand("USP_UpdateBrand", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@BrandId",id);
+                    cmd.Parameters.AddWithValue("@BrandId", id);
                     cmd.Parameters.AddWithValue("@BrandName", brands.BrandName);
                     cmd.Parameters.AddWithValue("@BrandDescription", brands.Description);
                     cmd.Parameters.AddWithValue("@IsActive", brands.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
 
-                    Brands  brandUpdate = null;  
+                    Brands brandUpdate = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
@@ -234,7 +234,7 @@ namespace FarmaDiDataAccess.Repositories
                     OperationStatusCode = -1,
                     Message = ex.Message,
 
-                };        
+                };
             }
         }
 
@@ -330,7 +330,66 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
+        public async Task<RepositoryResponse<(IEnumerable<Brands> Items, int TotalCount)>> GetBrandsPagedAsync(int page, int limit)
+        {
+            var brands = new List<Brands>();
+            var response = new RepositoryResponse<(IEnumerable<Brands> Items, int TotalCount)>();
+            int totalRecords = 0;
 
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    SqlCommand cmd = new SqlCommand("USP_GetBrandsPaged", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    //Parametros de entrada
 
+                    cmd.Parameters.AddWithValue("@PageNumber", page);
+                    cmd.Parameters.AddWithValue("@PageSize", limit);
+
+                    SqlParameter totalRecordsParam = new SqlParameter("@TotalRecords", SqlDbType.Int);
+                    totalRecordsParam.Direction = ParameterDirection.Output;
+                    cmd.Parameters.Add(totalRecordsParam);
+                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            brands.Add(new Brands
+                            {
+                                BrandId = (int)reader["BrandId"],
+                                BrandName = reader["BrandName"].ToString()!,
+                                Description = reader["BrandDescription"].ToString(),
+                                IsActive = (bool)reader["Isactive"]
+                            });
+                        }
+                    }
+                    var returnedValue = Convert.ToInt32(cmd.Parameters["@TotalRecords"].Value);
+                    if (totalRecordsParam.Value != DBNull.Value)
+                    {
+                        totalRecords = Convert.ToInt32(totalRecordsParam.Value);
+                    }
+                    response.Data = (brands, totalRecords);
+                    response.OperationStatusCode = 0;
+                }
+
+            }
+            catch (SqlException ex)
+            {
+                response.Data = (new List<Brands>(), 0);
+                response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                response.Data = (new List<Brands>(), 0);
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
+            }
+
+            return response;
+        }
     }
 }

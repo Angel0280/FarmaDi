@@ -396,12 +396,9 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@PageNumber", page);
                     cmd.Parameters.AddWithValue("@PageSize", limit);
 
-                    // Parámetro de salida para recuperar el total de registros
                     SqlParameter totalRecordsParam = new SqlParameter("@TotalRecords", SqlDbType.Int);
                     totalRecordsParam.Direction = ParameterDirection.Output;
                     cmd.Parameters.Add(totalRecordsParam);
-
-                    // Tu ReturnValue clásico
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())

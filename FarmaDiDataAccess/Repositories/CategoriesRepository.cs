@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
-    public class CategoriesRepository:ICategoriesRepository
+    public class CategoriesRepository : ICategoriesRepository
     {
 
         private readonly string _connectionString;
@@ -136,9 +136,9 @@ namespace FarmaDiDataAccess.Repositories
 
         public async Task<RepositoryResponse<Categories>> GetByIdAsync(int id)
         {
-          //  Categories categories = null;
+            //  Categories categories = null;
             var response = new Categories();
-           
+
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -338,6 +338,51 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
-
+        // Implementación del método de paginación
+        public async Task<RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>> GetCategoriesPagedAsync(int pageNumber, int pageSize)
+        {
+            var categories = new List<Categories>();
+            int totalCount = 0;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    SqlCommand cmd = new SqlCommand("USP_GetCategoriesPaged", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@PageNumber", pageNumber);
+                    cmd.Parameters.AddWithValue("@PageSize", pageSize);
+                    cmd.Parameters.Add("@TotalCount", SqlDbType.Int).Direction = ParameterDirection.Output;
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            categories.Add(new Categories
+                            {
+                                CategoryId = (int)reader["CategoryId"],
+                                CategoryName = reader["CategoryName"].ToString()!,
+                                CategoryDescription = reader["CategoryDescription"].ToString(),
+                                IsActive = (bool)reader["Isactive"]
+                            });
+                        }
+                    }
+                    totalCount = Convert.ToInt32(cmd.Parameters["@TotalCount"].Value);
+                    return new RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>
+                    {
+                        Data = (categories, totalCount),
+                        OperationStatusCode = 0
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>
+                {
+                    Data = (null, 0),
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
+        }
     }
 }
