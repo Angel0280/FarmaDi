@@ -352,7 +352,7 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@PageNumber", pageNumber);
                     cmd.Parameters.AddWithValue("@PageSize", pageSize);
-                    cmd.Parameters.Add("@TotalCount", SqlDbType.Int).Direction = ParameterDirection.Output;
+                    cmd.Parameters.Add("@TotalRecords", SqlDbType.Int).Direction = ParameterDirection.Output;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -366,7 +366,7 @@ namespace FarmaDiDataAccess.Repositories
                             });
                         }
                     }
-                    totalCount = Convert.ToInt32(cmd.Parameters["@TotalCount"].Value);
+                    totalCount = Convert.ToInt32(cmd.Parameters["@TotalRecords"].Value);
                     return new RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>
                     {
                         Data = (categories, totalCount),

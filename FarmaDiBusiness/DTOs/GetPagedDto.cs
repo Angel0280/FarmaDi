@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FarmaDiBusiness.DTOs
 {
-    public class GetBrandsPagedDto
+    public class GetPagedDto
     {
         public int TotalItems { get; set; }
         public int TotalPages { get; set; }

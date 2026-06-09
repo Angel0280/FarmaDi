@@ -3,6 +3,7 @@ using FarmaDiBusiness.Interfaces;
 using FarmaDiCore.Common;
 using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
+using FarmaDiDataAccess.Repositories;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
@@ -312,6 +313,41 @@ namespace FarmaDiBusiness.Services
             return response;
         }
 
+        public async Task<ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>> GetCategoriesPaged(int page, int limit)
+        {
+            var result = await _categoryRepository.GetCategoriesPagedAsync(page, limit);
+            if (result.OperationStatusCode == 0)
+            {
+                return new ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>()
+                {
+                    Data = result.Data,
+                    IsSuccess = true,
+                    MessageCode = MessageCodes.Success,
+                    Message = "Operación exitosa"
+                };
+            }
+            var messageCode = new MessageCodes();
+            var message = string.Empty;
+            switch (result.OperationStatusCode)
+            {
+                case 50009:
+                    messageCode = MessageCodes.NotFound;
+                    message = "No se encontraron marcas para la página solicitada";
+                    break;
+                default:
+                    messageCode = MessageCodes.ErrorDataBase;
+                    message = "Error en la base de datos al obtener las marcas.";
+                    break;
+            }
+            return new ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>
+            {
+                Data = (null, 0),
+                IsSuccess = false,
+                MessageCode = messageCode,
+                Message = message
+            };
+
+        }
     }
 
 }

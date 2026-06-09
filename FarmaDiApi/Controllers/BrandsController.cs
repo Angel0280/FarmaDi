@@ -336,7 +336,7 @@ namespace FarmaDiApi.Controllers
                 var apiResponse = new ApiResponse<IEnumerable<GetAllBrandsDto>>
                 {
                     Data = BrandsCollection,
-                    Meta = new GetBrandsPagedDto
+                    Meta = new GetPagedDto
                     {
                         TotalItems = totalCount,
                         TotalPages = totalPages,

@@ -75,10 +75,7 @@ namespace FarmaDiDataAccess.Repositories
 
             }
         }
-
-
-        // aqui mandamos a llamar todos los registros existentes en "marcas", si no hay registros
-        // mandamos un código personalizado 50009 --  
+ 
         public async Task<RepositoryResponse<IEnumerable<Brands>>> GetAllAsync()
         {
             var brands = new List<Brands>();

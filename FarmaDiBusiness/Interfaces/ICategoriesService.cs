@@ -17,5 +17,7 @@ namespace FarmaDiBusiness.Interfaces
         Task<ServiceResponse<Categories>> UpdateAsync(int id, UpdateCategoryDto category);
         Task<ServiceResponse<Categories>> GetByNameAsync(string name);
         Task<ServiceResponse<Categories>> SetStateAsync(int id, bool state);
+        Task<ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>> GetCategoriesPaged(int page, int limit);
+
     }
 }
