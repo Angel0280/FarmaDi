@@ -14,5 +14,6 @@ namespace FarmaDiCore.Common
         public MessageCodes MessageCode { get; set; }
         public string? Message { get; set; }
         public object? Details { get; set; }
+        public bool Success { get; set; }
     }
 }

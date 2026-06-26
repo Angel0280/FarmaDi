@@ -9,8 +9,8 @@ namespace FarmaDiCore.Entities
     public class Concentrations
     {
         public  int ConcentrationId { get; set; }
-        public  string ConcentrationName { get; set; }
-        public string? ConcentrationDescription { get; set; }
+        public  string Volume { get; set; }
+        public string? porcentage { get; set; }
         public bool IsActive { get; set; }
 
     }

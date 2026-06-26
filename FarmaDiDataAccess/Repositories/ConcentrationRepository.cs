@@ -11,7 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 
-public class ConcentrationRepository // : IConcentrationRepository// Revisar la interfaz 
+public class ConcentrationRepository  : IConcentrationRepository
 {
     private readonly string _connectionString;
 
@@ -60,18 +60,19 @@ public class ConcentrationRepository // : IConcentrationRepository// Revisar la 
         return response;
     }
 
+    */
     // Obtener todas las concentraciones
-    public async Task<RepositoryResponse<IEnumerable<Concentration>>> GetAllAsync()
+    public async Task<RepositoryResponse<IEnumerable<Concentrations>>> GetAllAsync()
     {
-        var list = new List<Concentration>();
-        var response = new RepositoryResponse<IEnumerable<Concentration>>();
+        var list = new List<Concentrations>();
+        var response = new RepositoryResponse<IEnumerable<Concentrations>>();
 
         try
         {
             using (SqlConnection connection = new SqlConnection(_connectionString))
             {
                 await connection.OpenAsync();
-                SqlCommand cmd = new SqlCommand("USP_GetConcentrations", connection);
+                SqlCommand cmd = new SqlCommand("USP_GetConcentration", connection);
                 cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
@@ -79,12 +80,12 @@ public class ConcentrationRepository // : IConcentrationRepository// Revisar la 
                 {
                     while (await reader.ReadAsync())
                     {
-                        list.Add(new Concentration
+                        list.Add(new Concentrations
                         {
                             ConcentrationId = (int)reader["ConcentrationId"],
-                            ConcentrationName = reader["ConcentrationName"].ToString()!,
-                            ConcentrationDescription = reader["ConcentrationDescription"].ToString(),
-                            IsActive = (bool)reader["IsActive"]
+                            Volume = reader["Volume"].ToString()!,
+                            porcentage = reader["Porcentage"].ToString(),
+                            IsActive = (bool)reader["Isactive"]
                         });
                     }
                 }
@@ -109,9 +110,9 @@ public class ConcentrationRepository // : IConcentrationRepository// Revisar la 
 
         return response;
     }
-
+    /*
     // Obtener concentración por ID
-    public async Task<RepositoryResponse<Concentration>> GetByIdAsync(int id)
+    public async Task<RepositoryResponse<Concentrations>> GetByIdAsync(int id)
     {
         var response = new RepositoryResponse<int>();
         try
@@ -128,7 +129,7 @@ public class ConcentrationRepository // : IConcentrationRepository// Revisar la 
 
                 var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
 
-                return new RepositoryResponse<Concentration>
+                return new RepositoryResponse<Concentrations>
                 {
                     Data = response,
                     OperationStatusCode = returnedValue
@@ -137,7 +138,7 @@ public class ConcentrationRepository // : IConcentrationRepository// Revisar la 
         }
         catch (SqlException ex)
         {
-            return new RepositoryResponse<Concentration>
+            return new RepositoryResponse<Concentrations>
             {
                 Data = null,
                 OperationStatusCode = ex.Number,
@@ -145,7 +146,7 @@ public class ConcentrationRepository // : IConcentrationRepository// Revisar la 
             };
         }
     }
-
+    /*
     // Actualizar concentración
     public async Task<RepositoryResponse<Concentration>> UpdateAsync(int id, Concentration concentration)
     {

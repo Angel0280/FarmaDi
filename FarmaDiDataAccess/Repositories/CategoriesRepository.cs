@@ -3,29 +3,22 @@ using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
     public class CategoriesRepository : ICategoriesRepository
     {
-
         private readonly string _connectionString;
+
         public CategoriesRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")!;
         }
 
-
-        // aqui agregamos una categoria a la base de datos
         public async Task<RepositoryResponse<Categories>> AddAsync(Categories category)
         {
-            var response = new Categories();
+            var categoryResult = new Categories();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -36,33 +29,26 @@ namespace FarmaDiDataAccess.Repositories
 
                     cmd.Parameters.AddWithValue("@CategoryName", category.CategoryName);
                     cmd.Parameters.AddWithValue("@CategoryDescription", category.CategoryDescription);
-                    //cmd.Parameters.AddWithValue("@IsActive", brand.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.CategoryId = (int)reader["CategoryId"];
-                            response.CategoryName = reader["CategoryName"].ToString()!;
-                            response.CategoryDescription = reader["CategoryDescription"].ToString();
-                            response.IsActive = (bool)reader["IsActive"];
-
+                            categoryResult.CategoryId = (int)reader["CategoryId"];
+                            categoryResult.CategoryName = reader["CategoryName"].ToString()!;
+                            categoryResult.CategoryDescription = reader["CategoryDescription"].ToString();
+                            categoryResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
-
-                    // capturamos el código que viene del procedimiento 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
                     return new RepositoryResponse<Categories>
                     {
-                        Data = response,
+                        Data = categoryResult,
                         OperationStatusCode = returnedValue
-
                     };
                 }
-
-
             }
             catch (SqlException ex)
             {
@@ -71,22 +57,25 @@ namespace FarmaDiDataAccess.Repositories
                     Data = null,
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
-
                 };
-
+            }
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Categories>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
             }
         }
 
-
-        // aqui mandamos a llamar todos los registros existentes en "Categorias", si no hay registros
-        // mandamos un código personalizado 50009 --  
         public async Task<RepositoryResponse<IEnumerable<Categories>>> GetAllAsync()
         {
-            var category = new List<Categories>();
+            var categoryList = new List<Categories>();
             var response = new RepositoryResponse<IEnumerable<Categories>>();
             try
             {
-                // establecemos la conexion con la base de datos
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
@@ -98,7 +87,7 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            category.Add(new Categories
+                            categoryList.Add(new Categories
                             {
                                 CategoryId = (int)reader["CategoryId"],
                                 CategoryName = reader["CategoryName"].ToString()!,
@@ -107,38 +96,30 @@ namespace FarmaDiDataAccess.Repositories
                             });
                         }
                     }
-                    //Capturando el valor que retorna  el procedimiento almacenado 
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = category;
+                    response.Data = categoryList;
                     response.OperationStatusCode = returnedValue;
-
                 }
             }
             catch (SqlException ex)
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
             }
-
             catch (Exception ex)
             {
-                return new RepositoryResponse<IEnumerable<Categories>>
-                {
-                    Data = null,
-                    OperationStatusCode = -1,
-                    Message = ex.Message
-                };
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
             }
             return response;
         }
 
-
         public async Task<RepositoryResponse<Categories>> GetByIdAsync(int id)
         {
-            //  Categories categories = null;
-            var response = new Categories();
-
+            var categoryResult = new Categories();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -149,30 +130,25 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@CategoryId", id);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.CategoryId = (int)reader["CategoryId"];
-                            response.CategoryName = reader["CategoryName"].ToString();
-                            response.CategoryDescription = reader["CategoryDescription"].ToString();
-                            response.IsActive = (bool)reader["Isactive"];
-
+                            categoryResult.CategoryId = (int)reader["CategoryId"];
+                            categoryResult.CategoryName = reader["CategoryName"].ToString();
+                            categoryResult.CategoryDescription = reader["CategoryDescription"].ToString();
+                            categoryResult.IsActive = (bool)reader["Isactive"];
                         }
                         else
                         {
-
-                            response = null;
+                            categoryResult = null;
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-
                     return new RepositoryResponse<Categories>
                     {
-                        Data = response,
+                        Data = categoryResult,
                         OperationStatusCode = returnedValue
                     };
                 }
@@ -185,11 +161,17 @@ namespace FarmaDiDataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Categories>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
         }
-
 
         public async Task<RepositoryResponse<Categories>> UpdateAsync(int id, Categories category)
         {
@@ -204,15 +186,13 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@CategoryName", category.CategoryName);
                     cmd.Parameters.AddWithValue("@CategoryDescription", category.CategoryDescription);
                     cmd.Parameters.AddWithValue("@Isactive", category.IsActive);
-                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
-                    Categories Update = null;
+                    Categories updatedCategory = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Update = new Categories
+                            updatedCategory = new Categories
                             {
                                 CategoryId = (int)reader["CategoryId"],
                                 CategoryName = reader["CategoryName"].ToString()!,
@@ -221,16 +201,11 @@ namespace FarmaDiDataAccess.Repositories
                             };
                         }
                     }
-                    // var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-                    // response.Data = brandUpdate;
-                    // response.OperationStatusCode = returnedValue;
 
                     return new RepositoryResponse<Categories>
                     {
-                        Data = Update,
-                        OperationStatusCode = 0,
-
-
+                        Data = updatedCategory,
+                        OperationStatusCode = 0
                     };
                 }
             }
@@ -239,20 +214,25 @@ namespace FarmaDiDataAccess.Repositories
                 return new RepositoryResponse<Categories>
                 {
                     Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
+            }
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Categories>
+                {
+                    Data = null,
                     OperationStatusCode = -1,
-                    Message = ex.Message,
-
+                    Message = ex.Message
                 };
             }
         }
 
-
-
         public async Task<RepositoryResponse<Categories>> GetByNameAsync(string name)
         {
-            var category = new Categories();
+            var categoryResult = new Categories();
             var response = new RepositoryResponse<Categories>();
-
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -267,18 +247,16 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
-                            category.CategoryId = (int)reader["CategoryId"];
-                            category.CategoryName = reader["CategoryName"].ToString()!;
-                            category.CategoryDescription = reader["CategoryDescription"].ToString();
-                            category.IsActive = (bool)reader["Isactive"];
+                            categoryResult.CategoryId = (int)reader["CategoryId"];
+                            categoryResult.CategoryName = reader["CategoryName"].ToString()!;
+                            categoryResult.CategoryDescription = reader["CategoryDescription"].ToString();
+                            categoryResult.IsActive = (bool)reader["Isactive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = category;
+                    response.Data = categoryResult;
                     response.OperationStatusCode = returnedValue;
-
                     return response;
                 }
             }
@@ -286,10 +264,17 @@ namespace FarmaDiDataAccess.Repositories
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
                 return response;
             }
         }
-
 
         public async Task<RepositoryResponse<Categories>> SetStateAsync(int id, bool state)
         {
@@ -298,19 +283,17 @@ namespace FarmaDiDataAccess.Repositories
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-
                     SqlCommand cmd = new SqlCommand("USP_UpdateCategoryStatus", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@CategoryId", id);
                     cmd.Parameters.AddWithValue("@Isactive", state);
 
-                    Categories Updated = null;
-
+                    Categories updatedCategory = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Updated = new Categories
+                            updatedCategory = new Categories
                             {
                                 CategoryId = (int)reader["CategoryId"],
                                 CategoryName = reader["CategoryName"].ToString(),
@@ -322,10 +305,19 @@ namespace FarmaDiDataAccess.Repositories
 
                     return new RepositoryResponse<Categories>
                     {
-                        Data = Updated,
-                        OperationStatusCode = Updated != null ? 0 : 1
+                        Data = updatedCategory,
+                        OperationStatusCode = updatedCategory != null ? 0 : 1
                     };
                 }
+            }
+            catch (SqlException ex)
+            {
+                return new RepositoryResponse<Categories>
+                {
+                    Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
             }
             catch (Exception ex)
             {
@@ -338,10 +330,9 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
-        // Implementación del método de paginación
         public async Task<RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>> GetCategoriesPagedAsync(int pageNumber, int pageSize)
         {
-            var categories = new List<Categories>();
+            var categoryList = new List<Categories>();
             int totalCount = 0;
             try
             {
@@ -353,11 +344,12 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@PageNumber", pageNumber);
                     cmd.Parameters.AddWithValue("@PageSize", pageSize);
                     cmd.Parameters.Add("@TotalRecords", SqlDbType.Int).Direction = ParameterDirection.Output;
+
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            categories.Add(new Categories
+                            categoryList.Add(new Categories
                             {
                                 CategoryId = (int)reader["CategoryId"],
                                 CategoryName = reader["CategoryName"].ToString()!,
@@ -366,19 +358,33 @@ namespace FarmaDiDataAccess.Repositories
                             });
                         }
                     }
-                    totalCount = Convert.ToInt32(cmd.Parameters["@TotalRecords"].Value);
+
+                    if (cmd.Parameters["@TotalRecords"].Value != DBNull.Value)
+                    {
+                        totalCount = Convert.ToInt32(cmd.Parameters["@TotalRecords"].Value);
+                    }
+
                     return new RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>
                     {
-                        Data = (categories, totalCount),
+                        Data = (categoryList, totalCount),
                         OperationStatusCode = 0
                     };
                 }
+            }
+            catch (SqlException ex)
+            {
+                return new RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>
+                {
+                    Data = (new List<Categories>(), 0),
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
             }
             catch (Exception ex)
             {
                 return new RepositoryResponse<(IEnumerable<Categories> Items, int TotalCount)>
                 {
-                    Data = (null, 0),
+                    Data = (new List<Categories>(), 0),
                     OperationStatusCode = -1,
                     Message = ex.Message
                 };

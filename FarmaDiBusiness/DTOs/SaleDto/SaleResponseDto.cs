@@ -12,10 +12,11 @@ namespace FarmaDiBusiness.DTOs.SaleDto
         public int InvoiceId { get; set; }
         public int UserId { get; set; }
         public string ClientName { get; set; }
-        public DateOnly SaleDate { get; set; }
+        public DateTime SaleDate { get; set; }
         public decimal SubTotal { get; set; }
         public decimal Discount { get; set; }
         public decimal TotalAmount { get; set; }
+        public bool IsPrinted { get; set; }
         public int PaymethMethodId { get; set; }
         public List<SalesDetailsResponseDto> Details { get; set; }
 

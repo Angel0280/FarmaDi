@@ -16,7 +16,6 @@ namespace FarmaDiBusiness.DTOs.SaleDto
         [Required(ErrorMessage = "La cantidad es obligatoria")]
         [Range(1, int.MaxValue, ErrorMessage = "La cantidad no es válida")]
         public int Quantity { get; set; }
-          
-       
+        public decimal UnitPrice { get; internal set; }
     }
 }

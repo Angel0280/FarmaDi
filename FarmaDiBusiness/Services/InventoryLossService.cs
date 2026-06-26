@@ -4,74 +4,78 @@ using FarmaDiBusiness.Interfaces;
 using FarmaDiCore.Common;
 using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
-using FarmaDiDataAccess.Repositories;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiBusiness.Services
 {
-    public class InventoryLossService: IInventoryLossService
+    public class InventoryLossService : IInventoryLossService
     {
-        private readonly IInventoryLossRepository _InventoryLossRepository;
-        private readonly IProductBatchesRepository _ProductBatchesRepository;
-        public InventoryLossService(IInventoryLossRepository InventoryLossRepository, IProductBatchesRepository productBatchesRepository)
+        private readonly IInventoryLossRepository _inventoryLossRepository;
+        private readonly IProductBatchesRepository _productBatchesRepository;
+
+        public InventoryLossService(IInventoryLossRepository inventoryLossRepository, IProductBatchesRepository productBatchesRepository)
         {
-
-            _InventoryLossRepository = InventoryLossRepository;
-            _ProductBatchesRepository = productBatchesRepository;
+            _inventoryLossRepository = inventoryLossRepository;
+            _productBatchesRepository = productBatchesRepository;
         }
-
 
         public async Task<ServiceResponse<IEnumerable<InventoryLoss>>> GetAllAsync()
         {
-            var result = await _InventoryLossRepository.GetAllAsync();
-
-            if (result.OperationStatusCode == 0)
+            try
             {
-                return new ServiceResponse<IEnumerable<InventoryLoss>>()
+                // CORREGIDO: Envoltorio try-catch para proteger contra caídas de conexión
+                var result = await _inventoryLossRepository.GetAllAsync();
+
+                if (result.OperationStatusCode == 0)
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Operacion exitosa"
-                };
-
-
-            }
-            switch (result.OperationStatusCode)
-            {
-                case 50009:
                     return new ServiceResponse<IEnumerable<InventoryLoss>>
                     {
                         Data = result.Data,
                         IsSuccess = true,
-                        MessageCode = MessageCodes.NoData,
-                        Message = "No se encontraron registros"
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
                     };
+                }
 
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        return new ServiceResponse<IEnumerable<InventoryLoss>>
+                        {
+                            Data = result.Data,
+                            IsSuccess = false, // CORREGIDO: Consistencia semántica de estado fallido
+                            MessageCode = MessageCodes.NoData,
+                            Message = "No se encontraron registros"
+                        };
 
-                default:
-                    return new ServiceResponse<IEnumerable<InventoryLoss>>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.NoData,
-                        Message = "Ocurrió un error inesperado"
-                    };
-
+                    default:
+                        return new ServiceResponse<IEnumerable<InventoryLoss>>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase, // CORREGIDO: Antes NoData de forma errónea
+                            Message = "Ocurrió un error inesperado"
+                        };
+                }
             }
-
+            catch (Exception)
+            {
+                return new ServiceResponse<IEnumerable<InventoryLoss>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al recuperar las bajas de inventario"
+                };
+            }
         }
-
 
         public async Task<ServiceResponse<InventoryLoss>> GetByIdAsync(int id)
         {
-            var result = await _InventoryLossRepository.GetByIdAsync(id);
             try
             {
+                // CORREGIDO: Movido de forma segura al interior del bloque try
+                var result = await _inventoryLossRepository.GetByIdAsync(id);
+
                 if (result.OperationStatusCode == 0)
                 {
                     return new ServiceResponse<InventoryLoss>
@@ -82,9 +86,10 @@ namespace FarmaDiBusiness.Services
                         Message = result.Message ?? "Operación exitosa"
                     };
                 }
+
                 switch (result.OperationStatusCode)
                 {
-                    case 50009: // Ejemplo: código para no encontrado
+                    case 50009:
                         return new ServiceResponse<InventoryLoss>
                         {
                             Data = null,
@@ -93,7 +98,7 @@ namespace FarmaDiBusiness.Services
                             Message = "La baja no existe"
                         };
 
-                    case 50007: 
+                    case 50007:
                         return new ServiceResponse<InventoryLoss>
                         {
                             Data = null,
@@ -101,6 +106,7 @@ namespace FarmaDiBusiness.Services
                             MessageCode = MessageCodes.Conflict,
                             Message = "Cantidad inferior a la requerida"
                         };
+
                     default:
                         return new ServiceResponse<InventoryLoss>
                         {
@@ -113,69 +119,46 @@ namespace FarmaDiBusiness.Services
             }
             catch (Exception)
             {
-                return new ServiceResponse<InventoryLoss >
+                return new ServiceResponse<InventoryLoss>
                 {
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = result.Message ?? "Ocurrió un error inesperado"
-
+                    // CORREGIDO: Mensaje estático seguro para prevenir NullReferenceException en runtime
+                    Message = "Ocurrió un error inesperado al consultar el registro de la baja"
                 };
             }
         }
 
-
         public async Task<ServiceResponse<InventoryLoss>> AddAsync(AddInventoryLossDto newInventoryLoss)
         {
-
             try
             {
-                /*
-                var existing = await _InventoryLossRepository.GetByNameAsync(newbrand.BrandName);
+                // CORREGIDO: Eliminación de código comentado (zombi) de Marcas
 
-                if (existing.Data!.BrandId != 0 && !existing.Data.BrandName.IsNullOrEmpty())
+                // CORREGIDO: Corrección de bug de lógica invertida y validación real de existencia de Lote
+                var existBatch = await _productBatchesRepository.GetByIdAsync(newInventoryLoss.BatchId);
+                if (existBatch?.Data == null || existBatch.OperationStatusCode != 0)
                 {
                     return new ServiceResponse<InventoryLoss>
                     {
                         Data = null,
-                        IsSuccess = false, ///.//
-                        MessageCode = MessageCodes.ErrorValidation,
-                        Message = "Existe un registro con el nombre proporcionado"
-
-                    };
-
-                }*/
-             
-
-                var existBatch = await _ProductBatchesRepository.GetByIdAsync( newInventoryLoss.BatchId);
-                if (existBatch != null)
-                {
-                    return new ServiceResponse<InventoryLoss>
-                    {
-                        Data = null,
-                        IsSuccess = false, ///.//
+                        IsSuccess = false,
                         MessageCode = MessageCodes.NotFound,
                         Message = "No se encontró un lote con el id brindado"
-
                     };
-
-
-
                 }
-
 
                 var inventoryLoss = new InventoryLoss
                 {
-
                     BatchId = newInventoryLoss.BatchId,
                     Quantity = newInventoryLoss.Quantity,
                     ProductId = newInventoryLoss.ProductId,
                     UserId = newInventoryLoss.UserId,
                     Reason = newInventoryLoss.Reason,
-
                 };
 
-                var result = await _InventoryLossRepository.AddAsync(inventoryLoss);
+                var result = await _inventoryLossRepository.AddAsync(inventoryLoss);
 
                 return new ServiceResponse<InventoryLoss>
                 {
@@ -184,9 +167,6 @@ namespace FarmaDiBusiness.Services
                     MessageCode = MessageCodes.Success,
                     Message = "Baja registrada correctamente"
                 };
-
-
-
             }
             catch (Exception)
             {
@@ -195,20 +175,9 @@ namespace FarmaDiBusiness.Services
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = "Ocurrió un error inesperado",
+                    Message = "Ocurrió un error inesperado al registrar la baja de inventario",
                 };
             }
-
-
         }
-
-
-
-
-
-
-
-       
-
     }
 }

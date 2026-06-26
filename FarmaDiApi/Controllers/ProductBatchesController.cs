@@ -1,11 +1,7 @@
 ﻿using FarmaDiBusiness.DTOs;
-using FarmaDiBusiness.DTOs.InventoryLossDto;
 using FarmaDiBusiness.DTOs.ProductBatchesDto;
-using FarmaDiBusiness.DTOs.StockDto;
 using FarmaDiBusiness.Interfaces;
-using FarmaDiBusiness.Services;
 using FarmaDiCore.Common;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FarmaDiApi.Controllers
@@ -14,82 +10,69 @@ namespace FarmaDiApi.Controllers
     [ApiController]
     public class ProductBatchesController : ControllerBase
     {
+        private readonly IProductBatchesService _productBatchesService;
 
-
-        private readonly IProductBatchesService _Service;
-
-        //Constructor del controlador
-        public ProductBatchesController(IProductBatchesService productBatches)
+        public ProductBatchesController(IProductBatchesService productBatchesService)
         {
-            _Service = productBatches;
+            _productBatchesService = productBatchesService;
         }
-
 
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var serviceResponse = await _Service.GetAllAsync();
+            var serviceResponse = await _productBatchesService.GetAllAsync();
 
             if (serviceResponse.IsSuccess)
             {
-                var stockDtoCollection = serviceResponse.Data!.Select(c => new GetAllProductBatchesDto
+                // CORREGIDO: Renombrado de variable y conversión a lista para optimizar doble enumeración
+                var batchesDtoCollection = serviceResponse.Data!.Select(b => new GetAllProductBatchesDto
                 {
-                    BatchId = c.Id,
-                    BatchNumer = c.BatchNumer,              
-                    ManufacturingDate = c.ManufacturingDate,
-                    ExpirationDate = c.ExpirationDate,
-                    Quantity = c.Quantity,
-                    ProductId = c.oProduct.ProductId,
-                    ProductGenericName = c.oProduct.GenericName,
-                    ProductTradeName = c.oProduct.TradeName,
-                    
-                    IsActive = c.IsActive,
+                    BatchId = b.Id,
+                    BatchNumer = b.BatchNumer,
+                    ManufacturingDate = b.ManufacturingDate,
+                    ExpirationDate = b.ExpirationDate,
+                    Quantity = b.Quantity,
+                    ProductId = b.oProduct.ProductId,
+                    ProductGenericName = b.oProduct.GenericName,
+                    ProductTradeName = b.oProduct.TradeName,
+                    IsActive = b.IsActive,
+                }).ToList();
 
-                });
-
-                //preparamos la respuesta ApiResponse
                 var apiResponse = new ApiResponse<IEnumerable<GetAllProductBatchesDto>>
                 {
-                    Data = stockDtoCollection,
+                    Data = batchesDtoCollection,
                     Meta = new
                     {
-                        TotalAmount = stockDtoCollection.Count(),
+                        TotalAmount = batchesDtoCollection.Count,
                         message = serviceResponse.Message
-
                     }
                 };
                 return Ok(apiResponse);
             }
 
             var unsuccessfulResponse = new UnsuccessfulResponseDto();
-
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NoData:
                     unsuccessfulResponse.Code = "200";
                     unsuccessfulResponse.Message = "No se encontraron registros";
                     unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
-
                     return Ok(unsuccessfulResponse);
 
                 default:
                     unsuccessfulResponse.Code = "500";
                     unsuccessfulResponse.Message = "Ocurrió un error inesperado";
                     unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
-
                     return StatusCode(500, unsuccessfulResponse);
             }
-
         }
-
-
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            if (id <= 0 || id == null)
+            if (id <= 0) // CORREGIDO: Se eliminó 'id == null' por ser un int primitivo
             {
-                var response = new UnsuccessfulResponseDto()
+                var response = new UnsuccessfulResponseDto
                 {
                     Code = "400",
                     Message = "Id proporcionado debe de ser mayor a 0",
@@ -97,14 +80,16 @@ namespace FarmaDiApi.Controllers
                 };
                 return BadRequest(response);
             }
-            var serviceResponse = await _Service.GetByIdAsync(id);
+
+            var serviceResponse = await _productBatchesService.GetByIdAsync(id);
 
             if (serviceResponse.IsSuccess)
             {
-                var inventoryLossDto = new GetAllProductBatchesDto
+                // CORREGIDO: Se renombró la variable (antes llamada inventoryLossDto erróneamente)
+                var productBatchDto = new GetAllProductBatchesDto
                 {
                     BatchId = serviceResponse.Data!.Id,
-                    BatchNumer = serviceResponse.Data.BatchNumer, 
+                    BatchNumer = serviceResponse.Data.BatchNumer,
                     ManufacturingDate = serviceResponse.Data.ManufacturingDate,
                     ExpirationDate = serviceResponse.Data.ExpirationDate,
                     Quantity = serviceResponse.Data.Quantity,
@@ -112,33 +97,25 @@ namespace FarmaDiApi.Controllers
                     ProductGenericName = serviceResponse.Data.oProduct.GenericName,
                     ProductTradeName = serviceResponse.Data.oProduct.TradeName,
                     IsActive = serviceResponse.Data.IsActive,
-
                 };
 
-                return Ok(inventoryLossDto);
+                return Ok(productBatchDto);
             }
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NotFound:
-                    var unsuccessfulResponse = new UnsuccessfulResponseDto()
-                    {
-                        Code = "404",
-                        Message = "No se encontró un lote asociada al Id proporcionado",
-                        Details = new { info = serviceResponse.Message ?? "No se encontró el recurso solicitado" }
-                    };
-
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = "No se encontró un lote asociado al Id proporcionado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "No se encontró el recurso solicitado" };
                     return NotFound(unsuccessfulResponse);
 
                 default:
-                    unsuccessfulResponse = new UnsuccessfulResponseDto()
-                    {
-                        Code = "500",
-                        Message = "Ocurrió un error",
-                        Details = new { info = serviceResponse.Message ?? "Error interno no esperado" }
-                    };
-
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno no esperado" };
                     return StatusCode(500, unsuccessfulResponse);
-
             }
         }
     }

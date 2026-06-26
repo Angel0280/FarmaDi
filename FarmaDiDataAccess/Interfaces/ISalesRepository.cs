@@ -11,5 +11,7 @@ namespace FarmaDiDataAccess.Interfaces
     public interface ISalesRepository
     {
         Task<RepositoryResponse<SaleTransaction>> InsertAsync(Sale master, IEnumerable<SaleDetails> details);
+        Task<RepositoryResponse<SaleTransaction>> GetInvoiceByIdAsync(int invoiceId);
+        Task<RepositoryResponse<PagedSaleResult>> GetSalesAsync(int pageNumber = 1, int pageSize = 10);
     }
 }

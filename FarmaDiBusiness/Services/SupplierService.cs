@@ -318,6 +318,59 @@ namespace FarmaDiBusiness.Services
         }
 
 
+
+        public async Task<ServiceResponse<(IEnumerable<Suppliers> Items, int TotalCount)>> GetSuppliersPagedAsync(int page, int limit)
+        {
+            try
+            {
+                var result = await _supplierRepository.GetSupplierPagedAsync(page, limit);
+                if (result.OperationStatusCode == 0)
+                {
+                    return new ServiceResponse<(IEnumerable<Suppliers> Items, int TotalCount)>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
+                    };
+                }
+
+                var messageCode = MessageCodes.Success;
+                var message = string.Empty;
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        messageCode = MessageCodes.NotFound;
+                        message = "No se encontraron proveedores para la página solicitada";
+                        break;
+                    default:
+                        messageCode = MessageCodes.ErrorDataBase;
+                        message = "Error en la base de datos al obtener los proveedores.";
+                        break;
+                }
+
+                return new ServiceResponse<(IEnumerable<Suppliers> Items, int TotalCount)>
+                {
+                    Data = (new List<Suppliers>(), 0),
+                    IsSuccess = false,
+                    MessageCode = messageCode,
+                    Message = message
+                };
+            }
+            catch (Exception)
+            {
+                return new ServiceResponse<(IEnumerable<Suppliers> Items, int TotalCount)>
+                {
+                    Data = (new List<Suppliers>(), 0),
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al paginar los registros"
+                };
+            }
+        }
+
+
     }
 
 }

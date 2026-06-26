@@ -14,5 +14,6 @@ namespace FarmaDiBusiness.Interfaces
         Task<ServiceResponse<Suppliers>> UpdateAsync(int id, UpdateSupplierDto Supplier);
         Task<ServiceResponse<Suppliers>> GetByNameAsync(string name);
         Task<ServiceResponse<Suppliers>> SetStateAsync(int id, bool state);
+        Task<ServiceResponse<(IEnumerable<Suppliers> Items, int TotalCount)>> GetSuppliersPagedAsync(int page, int limit);
     }
 }

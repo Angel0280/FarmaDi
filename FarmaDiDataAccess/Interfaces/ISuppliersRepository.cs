@@ -27,5 +27,7 @@ namespace FarmaDiDataAccess.Interfaces
 
         
         Task<RepositoryResponse<Suppliers>> SetStateAsync(int id, bool state);
+
+        Task<RepositoryResponse<(IEnumerable<Suppliers> Items, int TotalCount)>> GetSupplierPagedAsync(int page, int limit);
     }
 }

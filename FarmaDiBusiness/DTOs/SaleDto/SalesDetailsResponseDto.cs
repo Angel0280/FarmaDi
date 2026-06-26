@@ -9,6 +9,8 @@ namespace FarmaDiBusiness.DTOs.SaleDto
     public class SalesDetailsResponseDto
     {
         public int ProductId { get; set; }
+        public string ProductTradeName { get; set; }   
+        public string ProductGenericName { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }

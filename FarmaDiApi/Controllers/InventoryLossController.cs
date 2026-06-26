@@ -1,11 +1,8 @@
 ﻿using FarmaDiBusiness.DTOs;
 using FarmaDiBusiness.DTOs.InventoryLossDto;
 using FarmaDiBusiness.Interfaces;
-using FarmaDiBusiness.Services;
 using FarmaDiCore.Common;
 using Microsoft.AspNetCore.Mvc;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace FarmaDiApi.Controllers
 {
@@ -13,82 +10,69 @@ namespace FarmaDiApi.Controllers
     [ApiController]
     public class InventoryLossController : ControllerBase
     {
+        private readonly IInventoryLossService _inventoryLossService;
 
-        private readonly IInventoryLossService _InventoryLossService;
-
-
-        public InventoryLossController(IInventoryLossService inventoryLoss)
+        public InventoryLossController(IInventoryLossService inventoryLossService)
         {
-            _InventoryLossService = inventoryLoss;
+            _inventoryLossService = inventoryLossService;
         }
 
-
-
-
-        // GET: api/<InventoryLossController>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var serviceResponse = await _InventoryLossService.GetAllAsync();
+            var serviceResponse = await _inventoryLossService.GetAllAsync();
 
             if (serviceResponse.IsSuccess)
             {
-
-                var InventoryLossDtoCollection = serviceResponse.Data!.Select(c => new GetAllInventoryLossDto
+                var inventoryLossDtoCollection = serviceResponse.Data!.Select(il => new GetAllInventoryLossDto
                 {
-                    LowId = c.LowId,
-                    BatchId = c.oBatch.Id,
-                    BatchNumber = c.oBatch.BatchNumer,
-                    Quantity = c.Quantity,
-                    ProductId = c.oProduct.ProductId,
-                    ProductGenericName = c.oProduct.GenericName,
-                    ProductTradeName = c.oProduct.TradeName,
-                    UserId = c.UserId,
-                    UserName = c.UserName,
-                    Reason = c.Reason,
-                });
+                    LowId = il.LowId,
+                    BatchId = il.oBatch.Id,
+                    BatchNumber = il.oBatch.BatchNumer,
+                    Quantity = il.Quantity,
+                    ProductId = il.oProduct.ProductId,
+                    ProductGenericName = il.oProduct.GenericName,
+                    ProductTradeName = il.oProduct.TradeName,
+                    UserId = il.UserId,
+                    UserName = il.UserName,
+                    Reason = il.Reason,
+                }).ToList(); // CORREGIDO: Evita doble enumeración al contar y mapear
 
-                //preparamos la respuesta ApiResponse
                 var apiResponse = new ApiResponse<IEnumerable<GetAllInventoryLossDto>>
                 {
-                    Data = InventoryLossDtoCollection,
+                    Data = inventoryLossDtoCollection,
                     Meta = new
                     {
-                        TotalAmount = InventoryLossDtoCollection.Count(),
+                        TotalAmount = inventoryLossDtoCollection.Count,
                         message = serviceResponse.Message
-
                     }
                 };
                 return Ok(apiResponse);
             }
 
             var unsuccessfulResponse = new UnsuccessfulResponseDto();
-
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NoData:
                     unsuccessfulResponse.Code = "200";
                     unsuccessfulResponse.Message = "No se encontraron registros";
                     unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
-
                     return Ok(unsuccessfulResponse);
 
                 default:
                     unsuccessfulResponse.Code = "500";
                     unsuccessfulResponse.Message = "Ocurrió un error inesperado";
                     unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
-
                     return StatusCode(500, unsuccessfulResponse);
             }
         }
 
-        // GET api/<InventoryLossController>/5
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            if (id <= 0 || id == null)
+            if (id <= 0) // CORREGIDO: Removido 'id == null' por ser un tipo int primitivo
             {
-                var response = new UnsuccessfulResponseDto()
+                var response = new UnsuccessfulResponseDto
                 {
                     Code = "400",
                     Message = "Id proporcionado debe de ser mayor a 0",
@@ -96,7 +80,8 @@ namespace FarmaDiApi.Controllers
                 };
                 return BadRequest(response);
             }
-            var serviceResponse = await _InventoryLossService.GetByIdAsync(id);
+
+            var serviceResponse = await _inventoryLossService.GetByIdAsync(id);
 
             if (serviceResponse.IsSuccess)
             {
@@ -105,7 +90,6 @@ namespace FarmaDiApi.Controllers
                     LowId = serviceResponse.Data!.LowId,
                     BatchId = serviceResponse.Data.oBatch.Id,
                     BatchNumber = serviceResponse.Data.oBatch.BatchNumer,
-
                     Quantity = serviceResponse.Data.Quantity,
                     ProductId = serviceResponse.Data.oProduct.ProductId,
                     ProductGenericName = serviceResponse.Data.oProduct.GenericName,
@@ -113,121 +97,98 @@ namespace FarmaDiApi.Controllers
                     UserId = serviceResponse.Data.UserId,
                     UserName = serviceResponse.Data.UserName,
                     Reason = serviceResponse.Data.Reason,
-
                 };
 
                 return Ok(inventoryLossDto);
             }
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NotFound:
-                    var unsuccessfulResponse = new UnsuccessfulResponseDto()
-                    {
-                        Code = "404",
-                        Message = "No se encontró una baja asociada al Id proporcionado",
-                        Details = new { info = serviceResponse.Message ?? "No se encontró el recurso solicitado" }
-                    };
-
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = "No se encontró una baja asociada al Id proporcionado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "No se encontró el recurso solicitado" };
                     return NotFound(unsuccessfulResponse);
 
                 default:
-                    unsuccessfulResponse = new UnsuccessfulResponseDto()
-                    {
-                        Code = "500",
-                        Message = "Ocurrió un error",
-                        Details = new { info = serviceResponse.Message ?? "Error interno no esperado" }
-                    };
-
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno no esperado" };
                     return StatusCode(500, unsuccessfulResponse);
-
             }
         }
 
-        // POST api/<InventoryLossController>
-
         [HttpPost]
-        public async Task<IActionResult> AddAsync([FromBody] AddInventoryLossDto addInventoryLossDto)
+        public async Task<IActionResult> Add([FromBody] AddInventoryLossDto addInventoryLossDto)
         {
-            //primero se tiene que validar que los id proporcionados esten realacionados a algun registro de la db
-
             if (addInventoryLossDto.Quantity <= 0)
             {
-                var unsuccessfulResponse = new UnsuccessfulResponseDto()
+                var unsuccessfulResponseQuantity = new UnsuccessfulResponseDto
                 {
-                    Code = "409",
+                    Code = "400", // CORREGIDO: Las validaciones de payload de entrada corresponden a BadRequest (400)
                     Message = "Cantidad inferior a la requerida",
                     Details = new { info = "La cantidad requerida para la operación debe ser mayor a 0" }
                 };
-
-                return Conflict(unsuccessfulResponse);
-
+                return BadRequest(unsuccessfulResponseQuantity);
             }
 
-            var id = addInventoryLossDto.BatchId;
+            // CORREGIDO: Se eliminó la variable muerta 'var id = addInventoryLossDto.BatchId;'
 
-           
-
-
-
-            var serviceResponse = await _InventoryLossService.AddAsync(addInventoryLossDto);
-
+            var serviceResponse = await _inventoryLossService.AddAsync(addInventoryLossDto);
 
             if (serviceResponse.IsSuccess)
             {
-                //ncuando se insertan valores de los id que no estan la respuesta devuelve nulo aqui 
-                var InvetoryLossDto = new InventoryLossDto
+                var inventoryLossDto = new InventoryLossDto
                 {
                     LowId = serviceResponse.Data!.LowId,
-                    BatchId = serviceResponse.Data!.oBatch.Id, 
-                    Quantity = -serviceResponse!.Data.Quantity,
-                    ProductId = serviceResponse!.Data.oProduct.ProductId,
-                    UserId = serviceResponse!.Data.UserId,
-                    Reason = serviceResponse!.Data.Reason,
-
+                    BatchId = serviceResponse.Data.oBatch.Id,
+                    Quantity = serviceResponse.Data.Quantity,
+                    ProductId = serviceResponse.Data.oProduct.ProductId,
+                    UserId = serviceResponse.Data.UserId,
+                    Reason = serviceResponse.Data.Reason,
                 };
+
                 return CreatedAtAction(
                     nameof(GetById),
-                    new { id = InvetoryLossDto.LowId },
-                    InvetoryLossDto);
-
-
+                    new { id = inventoryLossDto.LowId },
+                    inventoryLossDto);
             }
-            var unSuccessfulResponse = new UnsuccessfulResponseDto();
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.ErrorValidation:
-                    unSuccessfulResponse.Code = "409";
-                    unSuccessfulResponse.Message = "El nombre de la  baja ya existe";
-                    unSuccessfulResponse.Details = new { info = "No se puede duplicar información de la baja" };
-
-                    return Conflict(unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "409";
+                    unsuccessfulResponse.Message = "El nombre de la baja ya existe";
+                    unsuccessfulResponse.Details = new { info = "No se puede duplicar información de la baja" };
+                    return Conflict(unsuccessfulResponse);
 
                 case MessageCodes.NotFound:
-                    unSuccessfulResponse.Code = "404";
-                    unSuccessfulResponse.Message = "Recurso no encontrado";
-                    unSuccessfulResponse.Details = new { info = "No existe un lote que corresponda al id brindado" };
-                    return NotFound(unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = "Recurso no encontrado";
+                    unsuccessfulResponse.Details = new { info = "No existe un lote que corresponda al id brindado" };
+                    return NotFound(unsuccessfulResponse);
 
                 default:
-                    unSuccessfulResponse.Code = "500";
-                    unSuccessfulResponse.Message = "Ocurrió un error inesperado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
-
-                    return BadRequest(unSuccessfulResponse);
-
-
-
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
+                    // CORREGIDO: Antes retornaba BadRequest con código interno 500
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
 
-        // PUT api/<InventoryLossController>/5
         [HttpPut("{id}")]
-        public string Put(int id, [FromBody] string value)
+        public async Task<IActionResult> Put(int id, [FromBody] string value)
         {
-            var mensaje = "Estamos mejorando nuestros sistemas, por favor inténtelo otro dia";
-            return "Temporalmente se encuentra en mantenimiento. " + mensaje;
+            // CORREGIDO: Estructurado para cumplir con las buenas prácticas de respuestas REST de la aplicación
+            var mensaje = "Estamos mejorando nuestros sistemas, por favor inténtelo otro día";
+            return Ok(new
+            {
+                Status = "Mantenimiento",
+                Message = "Temporalmente se encuentra en mantenimiento. " + mensaje
+            });
         }
-
-  
     }
 }

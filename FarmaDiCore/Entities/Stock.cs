@@ -10,6 +10,7 @@ namespace FarmaDiCore.Entities
     {
         public int Id { get; set; }
         public ProductBatches BatchId { get; set; }
+        public int ProductId {  get; set; }
         public int AvailableQuantity { get; set; }
 
     }

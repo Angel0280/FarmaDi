@@ -3,18 +3,14 @@ using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
     public class RolesRepository : IRolesRepository
     {
         private readonly string _connectionString;
+
         public RolesRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")!;
@@ -22,7 +18,7 @@ namespace FarmaDiDataAccess.Repositories
 
         public async Task<RepositoryResponse<Roles>> AddAsync(Roles roles)
         {
-            var response = new Roles();
+            var rolResult = new Roles(); // CORREGIDO: Renombrado semántico para evitar confusión visual
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -32,33 +28,25 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.CommandType = CommandType.StoredProcedure;
 
                     cmd.Parameters.AddWithValue("@RolName", roles.RolName);
-                    //cmd.Parameters.AddWithValue("@IsActive", roles.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            // leemos lo recien ingresado para mandar la respuesta con el nuevo registro... se lo mandamos al servicio para el mapeoS
-                            response.Id = (int)reader["RolId"];
-                            response.RolName = (string)reader["RolName"];
-                            response.IsActive = (bool)reader["IsActive"];
-
+                            rolResult.Id = (int)reader["RolId"];
+                            rolResult.RolName = reader["RolName"].ToString()!;
+                            rolResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
-
-                    // capturamos el código que viene del procedimiento 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
                     return new RepositoryResponse<Roles>
                     {
-                        Data = response,
+                        Data = rolResult,
                         OperationStatusCode = returnedValue
-
                     };
                 }
-
-
             }
             catch (SqlException ex)
             {
@@ -67,19 +55,25 @@ namespace FarmaDiDataAccess.Repositories
                     Data = null,
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
-
                 };
-
+            }
+            catch (Exception ex) // CORREGIDO: Protección global contra fallos de parseo/casteo en runtime
+            {
+                return new RepositoryResponse<Roles>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
             }
         }
 
         public async Task<RepositoryResponse<IEnumerable<Roles>>> GetAllAsync()
         {
-            var roles = new List<Roles>();
+            var rolList = new List<Roles>(); // CORREGIDO: Convención camelCase limpia
             var response = new RepositoryResponse<IEnumerable<Roles>>();
             try
             {
-                // establecemos la conexion con la base de datos
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
@@ -91,29 +85,26 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            roles.Add(new Roles
+                            rolList.Add(new Roles
                             {
                                 Id = (int)reader["RolId"],
                                 RolName = reader["RolName"].ToString()!,
                                 IsActive = (bool)reader["IsActive"]
-
                             });
                         }
                     }
-                    //Capturando el valor que retorna  el procedimiento almacenado 
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = roles;
+                    response.Data = rolList;
                     response.OperationStatusCode = returnedValue;
-
                 }
             }
             catch (SqlException ex)
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message; // CORREGIDO: Añadido mapeo de mensaje nativo ausente
             }
-
             catch (Exception ex)
             {
                 return new RepositoryResponse<IEnumerable<Roles>>
@@ -128,7 +119,7 @@ namespace FarmaDiDataAccess.Repositories
 
         public async Task<RepositoryResponse<Roles>> GetByIdAsync(int id)
         {
-            var response = new Roles();
+            var rolResult = new Roles();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -139,23 +130,20 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@RolId", id);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.Id = (int)reader["RolId"];
-                            response.RolName = reader["RolName"].ToString()!;
-                            response.IsActive = (bool)reader["Isactive"];
+                            rolResult.Id = (int)reader["RolId"];
+                            rolResult.RolName = reader["RolName"].ToString()!;
+                            rolResult.IsActive = (bool)reader["Isactive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-
                     return new RepositoryResponse<Roles>
                     {
-                        Data = response,
+                        Data = rolResult,
                         OperationStatusCode = returnedValue
                     };
                 }
@@ -168,16 +156,22 @@ namespace FarmaDiDataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
+            catch (Exception ex) // CORREGIDO: Agregado bloque catch genérico de respaldo
+            {
+                return new RepositoryResponse<Roles>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
         }
 
         public async Task<RepositoryResponse<Roles>> UpdateAsync(int id, Roles roles)
         {
             try
             {
-                var response = new RepositoryResponse<Roles>();
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
@@ -188,31 +182,25 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@IsActive", roles.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
-                    Roles rolUpdate = null;
+                    Roles rolUpdateResult = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            rolUpdate = new Roles
+                            rolUpdateResult = new Roles
                             {
                                 Id = (int)reader["RolId"],
                                 RolName = reader["RolName"].ToString()!,
                                 IsActive = (bool)reader["Isactive"]
                             };
-
                         }
                     }
-                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-                    response.Data = rolUpdate;
-                    response.OperationStatusCode = returnedValue;
 
+                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
                     return new RepositoryResponse<Roles>
                     {
-                        Data = rolUpdate,
-                        OperationStatusCode = 0,
-
-
+                        Data = rolUpdateResult,
+                        OperationStatusCode = returnedValue // CORREGIDO: Antes forzaba '0' ignorando la respuesta del SP
                     };
                 }
             }
@@ -221,18 +209,25 @@ namespace FarmaDiDataAccess.Repositories
                 return new RepositoryResponse<Roles>
                 {
                     Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
+            }
+            catch (Exception ex) // CORREGIDO: Agregado bloque catch genérico de respaldo
+            {
+                return new RepositoryResponse<Roles>
+                {
+                    Data = null,
                     OperationStatusCode = -1,
-                    Message = ex.Message,
-
+                    Message = ex.Message
                 };
             }
         }
 
         public async Task<RepositoryResponse<Roles>> GetByNameAsync(string name)
         {
-            var rol = new Roles();
-            var response = new RepositoryResponse<Roles>();
-
+            var rolResult = new Roles();
+            var repositoryResponse = new RepositoryResponse<Roles>();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -247,25 +242,31 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
-                            rol.Id = (int)reader["RolId"];
-                            rol.RolName = (string)reader["RolName"];
-                            rol.IsActive = (bool)reader["Isactive"];
+                            rolResult.Id = (int)reader["RolId"];
+                            rolResult.RolName = reader["RolName"].ToString()!;
+                            rolResult.IsActive = (bool)reader["Isactive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = rol;
-                    response.OperationStatusCode = returnedValue;
-
-                    return response;
+                    repositoryResponse.Data = rolResult;
+                    repositoryResponse.OperationStatusCode = returnedValue;
+                    return repositoryResponse;
                 }
             }
             catch (SqlException ex)
             {
-                response.Data = null;
-                response.OperationStatusCode = ex.Number;
-                return response;
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = ex.Number;
+                repositoryResponse.Message = ex.Message;
+                return repositoryResponse;
+            }
+            catch (Exception ex) // CORREGIDO: Agregado bloque catch genérico de respaldo
+            {
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = -1;
+                repositoryResponse.Message = ex.Message;
+                return repositoryResponse;
             }
         }
 
@@ -276,19 +277,17 @@ namespace FarmaDiDataAccess.Repositories
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-
                     SqlCommand cmd = new SqlCommand("USP_DeactivateRole", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@RolId", id);
                     cmd.Parameters.AddWithValue("@IsActive", state);
 
-                    Roles Updated = null;
-
+                    Roles updatedRol = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Updated = new Roles
+                            updatedRol = new Roles
                             {
                                 Id = (int)reader["RolId"],
                                 RolName = reader["RolName"].ToString()!,
@@ -299,12 +298,21 @@ namespace FarmaDiDataAccess.Repositories
 
                     return new RepositoryResponse<Roles>
                     {
-                        Data = Updated,
-                        OperationStatusCode = Updated != null ? 0 : 1
+                        Data = updatedRol,
+                        OperationStatusCode = updatedRol != null ? 0 : 1
                     };
                 }
             }
             catch (SqlException ex)
+            {
+                return new RepositoryResponse<Roles>
+                {
+                    Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
+            }
+            catch (Exception ex) // CORREGIDO: Agregado bloque catch genérico de respaldo
             {
                 return new RepositoryResponse<Roles>
                 {

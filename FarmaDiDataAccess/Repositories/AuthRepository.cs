@@ -3,62 +3,57 @@ using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Identity.Client;
-using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
     public class AuthRepository : IAuthRepository
     {
         private readonly string _connectionString;
+
         public AuthRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")!;
         }
+
         public async Task<RepositoryResponse<Users>> RegisterAsync(Users user)
         {
-            var response = new Users();
+            var userResult = new Users(); // CORREGIDO: Renombrado semántico para evitar confusión visual
             try
             {
+                // CORREGIDO: El bloque try-catch ahora envuelve la creación de la conexión y el OpenAsync
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     SqlCommand cmd = new SqlCommand("USP_RegisterUser", connection);
-                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd.CommandType = CommandType.StoredProcedure;
+
                     cmd.Parameters.AddWithValue("@UserName", user.UserName);
                     cmd.Parameters.AddWithValue("@UserLastName", user.UserLastName);
                     cmd.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
                     cmd.Parameters.AddWithValue("@Mail", user.Mail);
-                    cmd.Parameters.AddWithValue("UserPhone", user.UserPhone);
-                    cmd.Parameters.AddWithValue("IsActive", user.IsActive);
+                    cmd.Parameters.AddWithValue("@UserPhone", user.UserPhone); // CORREGIDO: Añadido el prefijo '@'
+                    cmd.Parameters.AddWithValue("@IsActive", user.IsActive);   // CORREGIDO: Añadido el prefijo '@'
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
-
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.UserName = reader["UserName"].ToString()!;
-                            response.UserLastName = reader["UserLastName"].ToString()!;
-                            response.PasswordHash = reader["UserPassword"].ToString()!;
-                            response.Mail = reader["Mail"].ToString()!;
-                            response.UserPhone = reader["UserPhone"].ToString()!;
-                            response.IsActive = (bool)reader["Isactive"];
-
+                            userResult.UserName = reader["UserName"].ToString()!;
+                            userResult.UserLastName = reader["UserLastName"].ToString()!;
+                            userResult.PasswordHash = reader["UserPassword"].ToString()!;
+                            userResult.Mail = reader["Mail"].ToString()!;
+                            userResult.UserPhone = reader["UserPhone"].ToString()!;
+                            userResult.IsActive = (bool)reader["Isactive"];
                         }
                     }
 
-                    var returmedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
+                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value); // CORREGIDO: Corrección de typo
                     return new RepositoryResponse<Users>
                     {
-                        Data = response,
-                        OperationStatusCode = returmedValue
+                        Data = userResult,
+                        OperationStatusCode = returnedValue
                     };
                 }
             }
@@ -70,18 +65,27 @@ namespace FarmaDiDataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
+            catch (Exception ex) // CORREGIDO: Agregado control global contra fallos de mapeo/lectura
+            {
+                return new RepositoryResponse<Users>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
         }
+
         public async Task<RepositoryResponse<Users>> GetByEmailAsync(string mail)
         {
-            var user = new Users();
-            var response = new RepositoryResponse<Users>();
+            var userResult = new Users();
+            var repositoryResponse = new RepositoryResponse<Users>();
 
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                try
+                // CORREGIDO: Reubicación del try-catch hacia la raíz del método
+                using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     SqlCommand cmd = new SqlCommand("USP_GetUserByEmail", connection);
@@ -89,46 +93,56 @@ namespace FarmaDiDataAccess.Repositories
 
                     cmd.Parameters.AddWithValue("@Mail", mail);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
+
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            user.UserId = (int)reader["UserId"];
-                            user.UserName = reader["UserName"].ToString()!;
-                            user.UserLastName = reader["UserLastName"].ToString()!;
-                            user.PasswordHash = reader["PasswordHash"].ToString()!;
-                            user.Mail = reader["Mail"].ToString()!;
-                            user.UserPhone = reader["UserPhone"].ToString()!;
-                            user.IsActive = (bool)reader["IsActive"];
+                            userResult.UserId = (int)reader["UserId"];
+                            userResult.UserName = reader["UserName"].ToString()!;
+                            userResult.UserLastName = reader["UserLastName"].ToString()!;
+                            userResult.PasswordHash = reader["PasswordHash"].ToString()!;
+                            userResult.Mail = reader["Mail"].ToString()!;
+                            userResult.UserPhone = reader["UserPhone"].ToString()!;
+                            userResult.IsActive = (bool)reader["IsActive"];
+                        }
+                        else
+                        {
+                            userResult = null;
                         }
                     }
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = user;
-                    response.OperationStatusCode = returnedValue;
-
-                    return response;
-
+                    repositoryResponse.Data = userResult;
+                    repositoryResponse.OperationStatusCode = returnedValue;
+                    return repositoryResponse;
                 }
-                catch (SqlException ex)
-                {
-                    response.Data = null;
-                    response.OperationStatusCode = ex.Number;
-                    return response;
-                }
-
-
-
+            }
+            catch (SqlException ex)
+            {
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = ex.Number;
+                repositoryResponse.Message = ex.Message;
+                return repositoryResponse;
+            }
+            catch (Exception ex) // CORREGIDO: Agregado control global contra fallos de infraestructura/mapeo
+            {
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = -1;
+                repositoryResponse.Message = ex.Message;
+                return repositoryResponse;
             }
         }
+
         public async Task<RepositoryResponse<Users>> GetByUserNameAsync(string name)
         {
-            var user = new Users();
-            var response = new RepositoryResponse<Users>();
+            var userResult = new Users();
+            var repositoryResponse = new RepositoryResponse<Users>();
 
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                try
+                // CORREGIDO: Reubicación del try-catch hacia la raíz del método
+                using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     SqlCommand cmd = new SqlCommand("USP_GetUserByName", connection);
@@ -140,40 +154,51 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
-                            user.UserId = (int)reader["UserId"];
-                            user.UserName = reader["UserName"].ToString()!;
-                            user.UserLastName = reader["UserLastName"].ToString()!;
-                            user.Mail = reader["Mail"].ToString()!;
-                            user.PasswordHash = reader["UserPassword"].ToString()!;
-                            user.UserPhone = reader["UserPhone"].ToString()!;
-                            user.IsActive = (bool)reader["IsActive"];
-                            
+                            userResult.UserId = (int)reader["UserId"];
+                            userResult.UserName = reader["UserName"].ToString()!;
+                            userResult.UserLastName = reader["UserLastName"].ToString()!;
+                            userResult.Mail = reader["Mail"].ToString()!;
+                            userResult.PasswordHash = reader["UserPassword"].ToString()!;
+                            userResult.UserPhone = reader["UserPhone"].ToString()!;
+                            userResult.IsActive = (bool)reader["IsActive"];
+                        }
+                        else
+                        {
+                            userResult = null;
                         }
                     }
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = user;
-                    response.OperationStatusCode = returnedValue;
-
-                    return response;
+                    repositoryResponse.Data = userResult;
+                    repositoryResponse.OperationStatusCode = returnedValue;
+                    return repositoryResponse;
                 }
-                catch (SqlException ex)
-                {
-                    response.Data = null;
-                    response.OperationStatusCode = ex.Number;
-                    return response;
-                }
+            }
+            catch (SqlException ex)
+            {
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = ex.Number;
+                repositoryResponse.Message = ex.Message;
+                return repositoryResponse;
+            }
+            catch (Exception ex) // CORREGIDO: Agregado control global contra fallos de infraestructura/mapeo
+            {
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = -1;
+                repositoryResponse.Message = ex.Message;
+                return repositoryResponse;
             }
         }
 
         public async Task<RepositoryResponse<IEnumerable<string>>> GetRolesByUserIdAsync(int userId)
         {
-            var roles = new List<string>();
-            var response = new RepositoryResponse<IEnumerable<string>>();
+            var rolesList = new List<string>(); // CORREGIDO: Nombre de variable bajo estándar camelCase
+            var repositoryResponse = new RepositoryResponse<IEnumerable<string>>();
 
-            using (SqlConnection connection = new SqlConnection(_connectionString))
+            try
             {
-                try
+                // CORREGIDO: Reubicación del try-catch hacia la raíz del método
+                using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
                     SqlCommand cmd = new SqlCommand("USP_GetUserRolesByUserId", connection);
@@ -185,36 +210,30 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            roles.Add(reader["RolName"].ToString()!);
+                            rolesList.Add(reader["RolName"].ToString()!);
                         }
                     }
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = roles;
-                    response.OperationStatusCode = returnedValue;
-                    response.Message = "Operacion existosa";
-
-                    
+                    repositoryResponse.Data = rolesList;
+                    repositoryResponse.OperationStatusCode = returnedValue;
+                    repositoryResponse.Message = "Operación exitosa";
                 }
-                catch (SqlException ex)
-                {
-                    response.Data = null;
-                    response.OperationStatusCode = ex.Number;
-                    response.Message = ex.Message;
-
-                    
-                }
-                catch (Exception ex)
-                {
-                    response.Data = null;
-                    response.OperationStatusCode = -1;
-                    response.Message = ex.Message;
-
-                    return response;
-                }
-
-                return response;
             }
+            catch (SqlException ex)
+            {
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = ex.Number;
+                repositoryResponse.Message = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                repositoryResponse.Data = null;
+                repositoryResponse.OperationStatusCode = -1;
+                repositoryResponse.Message = ex.Message;
+            }
+
+            return repositoryResponse;
         }
     }
 }

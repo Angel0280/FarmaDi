@@ -17,5 +17,7 @@ namespace FarmaDiCore.Common
         NoData = 6,
         Conflict = 7,
         DuplicateData = 8,
+        FileExisting = 9,
+        BadRequest = 10,
     }
 }

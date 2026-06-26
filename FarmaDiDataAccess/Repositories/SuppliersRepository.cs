@@ -351,6 +351,69 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
+        public async Task<RepositoryResponse<(IEnumerable<Suppliers> Items, int TotalCount)>> GetSupplierPagedAsync(int page, int limit)
+        {
+            var supplierList = new List<Suppliers>();
+            var response = new RepositoryResponse<(IEnumerable<Suppliers> Items, int TotalCount)>();
+            int totalRecords = 0;
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    SqlCommand cmd = new SqlCommand("USP_GetSuppliersPage", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+
+                    cmd.Parameters.AddWithValue("@PageNumber", page);
+                    cmd.Parameters.AddWithValue("@PageSize", limit);
+
+                    SqlParameter totalRecordsParam = new SqlParameter("@TotalRecords", SqlDbType.Int);
+                    totalRecordsParam.Direction = ParameterDirection.Output;
+                    cmd.Parameters.Add(totalRecordsParam);
+                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            supplierList.Add(new Suppliers
+                            {
+                                SupplierId = (int)reader["SupplierId"],
+                                SupplierName = reader["SupplierName"].ToString(),
+                                RNC = reader["Rnc"].ToString(),
+                                Mail = reader["Mail"].ToString(),
+                                SupplierPhone = reader["SupplierPhone"].ToString(),
+                                SupplierAddress = reader["SupplierAddress"].ToString(),
+                                IsActive = (bool)reader["IsActive"]
+                            });
+                        }
+                    }
+
+                    if (totalRecordsParam.Value != DBNull.Value)
+                    {
+                        totalRecords = Convert.ToInt32(totalRecordsParam.Value);
+                    }
+
+                    response.Data = (supplierList, totalRecords);
+                    response.OperationStatusCode = 0;
+                }
+            }
+            catch (SqlException ex)
+            {
+                response.Data = (new List<Suppliers>(), 0);
+                response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                response.Data = (new List<Suppliers>(), 0);
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
+            }
+
+            return response;
+        }
 
 
 

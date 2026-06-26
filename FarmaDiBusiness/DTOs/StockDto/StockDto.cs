@@ -12,6 +12,7 @@ namespace FarmaDiBusiness.DTOs.StockDto
         public int StockId { get; set; }
         public int BachtId { get; set; }
         public string BatchNumber { get; set; }
+        public int ProductId { get; set; }
         public int AvailableQuantity { get; set; }
     }
 }

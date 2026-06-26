@@ -1,30 +1,24 @@
-﻿using FarmaDiCore.Common;
+﻿ using FarmaDiCore.Common;
 using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
     public class BrandsRepository : IBrandsRepository
     {
         private readonly string _connectionString;
+
         public BrandsRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")!;
         }
 
-
-        // aqui agregamos una marca a la base de datos
         public async Task<RepositoryResponse<Brands>> AddAsync(Brands brand)
         {
-            var response = new Brands();
+            var brandResult = new Brands();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -35,33 +29,26 @@ namespace FarmaDiDataAccess.Repositories
 
                     cmd.Parameters.AddWithValue("@BrandName", brand.BrandName);
                     cmd.Parameters.AddWithValue("@BrandDescription", brand.Description);
-                    //cmd.Parameters.AddWithValue("@IsActive", brand.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.BrandId = (int)reader["BrandId"];
-                            response.BrandName = reader["BrandName"].ToString()!;
-                            response.Description = reader["BrandDescription"].ToString();
-                            response.IsActive = (bool)reader["IsActive"];
-
+                            brandResult.BrandId = (int)reader["BrandId"];
+                            brandResult.BrandName = reader["BrandName"].ToString()!;
+                            brandResult.Description = reader["BrandDescription"].ToString();
+                            brandResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
-
-                    // capturamos el código que viene del procedimiento 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
                     return new RepositoryResponse<Brands>
                     {
-                        Data = response,
+                        Data = brandResult,
                         OperationStatusCode = returnedValue
-
                     };
                 }
-
-
             }
             catch (SqlException ex)
             {
@@ -70,19 +57,25 @@ namespace FarmaDiDataAccess.Repositories
                     Data = null,
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
-
                 };
-
+            }
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Brands>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
             }
         }
- 
+
         public async Task<RepositoryResponse<IEnumerable<Brands>>> GetAllAsync()
         {
-            var brands = new List<Brands>();
+            var brandList = new List<Brands>();
             var response = new RepositoryResponse<IEnumerable<Brands>>();
             try
             {
-                // establecemos la conexion con la base de datos
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
@@ -94,7 +87,7 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            brands.Add(new Brands
+                            brandList.Add(new Brands
                             {
                                 BrandId = (int)reader["BrandId"],
                                 BrandName = reader["BrandName"].ToString()!,
@@ -103,36 +96,30 @@ namespace FarmaDiDataAccess.Repositories
                             });
                         }
                     }
-                    //Capturando el valor que retorna  el procedimiento almacenado 
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = brands;
+                    response.Data = brandList;
                     response.OperationStatusCode = returnedValue;
-
                 }
             }
             catch (SqlException ex)
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
             }
-
             catch (Exception ex)
             {
-                return new RepositoryResponse<IEnumerable<Brands>>
-                {
-                    Data = null,
-                    OperationStatusCode = -1,
-                    Message = ex.Message
-                };
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
             }
             return response;
         }
 
-
         public async Task<RepositoryResponse<Brands>> GetByIdAsync(int id)
         {
-            var response = new Brands();
+            var brandResult = new Brands();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -143,25 +130,21 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@BrandId", id);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.BrandId = (int)reader["BrandId"];
-                            response.BrandName = reader["BrandName"].ToString();
-                            response.Description = reader["BrandDescription"].ToString();
-                            response.IsActive = (bool)reader["IsActive"];
-
+                            brandResult.BrandId = (int)reader["BrandId"];
+                            brandResult.BrandName = reader["BrandName"].ToString();
+                            brandResult.Description = reader["BrandDescription"].ToString();
+                            brandResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-
                     return new RepositoryResponse<Brands>
                     {
-                        Data = response,
+                        Data = brandResult,
                         OperationStatusCode = returnedValue
                     };
                 }
@@ -174,11 +157,17 @@ namespace FarmaDiDataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Brands>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
         }
-
 
         public async Task<RepositoryResponse<Brands>> UpdateAsync(int id, Brands brands)
         {
@@ -193,8 +182,6 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@BrandName", brands.BrandName);
                     cmd.Parameters.AddWithValue("@BrandDescription", brands.Description);
                     cmd.Parameters.AddWithValue("@IsActive", brands.IsActive);
-                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
-
 
                     Brands brandUpdate = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
@@ -210,16 +197,11 @@ namespace FarmaDiDataAccess.Repositories
                             };
                         }
                     }
-                    // var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-                    // response.Data = brandUpdate;
-                    // response.OperationStatusCode = returnedValue;
 
                     return new RepositoryResponse<Brands>
                     {
                         Data = brandUpdate,
-                        OperationStatusCode = 0,
-
-
+                        OperationStatusCode = 0
                     };
                 }
             }
@@ -228,20 +210,25 @@ namespace FarmaDiDataAccess.Repositories
                 return new RepositoryResponse<Brands>
                 {
                     Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
+            }
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Brands>
+                {
+                    Data = null,
                     OperationStatusCode = -1,
-                    Message = ex.Message,
-
+                    Message = ex.Message
                 };
             }
         }
 
-
-
         public async Task<RepositoryResponse<Brands>> GetByNameAsync(string name)
         {
-            var brand = new Brands();
+            var brandResult = new Brands();
             var response = new RepositoryResponse<Brands>();
-
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -256,18 +243,16 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
-                            brand.BrandId = (int)reader["BrandId"];
-                            brand.BrandName = reader["BrandName"].ToString()!;
-                            brand.Description = reader["BrandDescription"].ToString();
-                            brand.IsActive = (bool)reader["IsActive"];
+                            brandResult.BrandId = (int)reader["BrandId"];
+                            brandResult.BrandName = reader["BrandName"].ToString()!;
+                            brandResult.Description = reader["BrandDescription"].ToString();
+                            brandResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = brand;
+                    response.Data = brandResult;
                     response.OperationStatusCode = returnedValue;
-
                     return response;
                 }
             }
@@ -275,10 +260,17 @@ namespace FarmaDiDataAccess.Repositories
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
                 return response;
             }
         }
-
 
         public async Task<RepositoryResponse<Brands>> SetStateAsync(int id, bool state)
         {
@@ -287,19 +279,17 @@ namespace FarmaDiDataAccess.Repositories
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-
                     SqlCommand cmd = new SqlCommand("USP_UpdateBrandStatus", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@BrandId", id);
                     cmd.Parameters.AddWithValue("@IsActive", state);
 
-                    Brands Updated = null;
-
+                    Brands updatedBrand = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Updated = new Brands
+                            updatedBrand = new Brands
                             {
                                 BrandId = (int)reader["BrandId"],
                                 BrandName = reader["BrandName"].ToString(),
@@ -311,10 +301,19 @@ namespace FarmaDiDataAccess.Repositories
 
                     return new RepositoryResponse<Brands>
                     {
-                        Data = Updated,
-                        OperationStatusCode = Updated != null ? 0 : 1
+                        Data = updatedBrand,
+                        OperationStatusCode = updatedBrand != null ? 0 : 1
                     };
                 }
+            }
+            catch (SqlException ex)
+            {
+                return new RepositoryResponse<Brands>
+                {
+                    Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
             }
             catch (Exception ex)
             {
@@ -329,7 +328,7 @@ namespace FarmaDiDataAccess.Repositories
 
         public async Task<RepositoryResponse<(IEnumerable<Brands> Items, int TotalCount)>> GetBrandsPagedAsync(int page, int limit)
         {
-            var brands = new List<Brands>();
+            var brandList = new List<Brands>();
             var response = new RepositoryResponse<(IEnumerable<Brands> Items, int TotalCount)>();
             int totalRecords = 0;
 
@@ -340,7 +339,6 @@ namespace FarmaDiDataAccess.Repositories
                     await connection.OpenAsync();
                     SqlCommand cmd = new SqlCommand("USP_GetBrandsPaged", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
-                    //Parametros de entrada
 
                     cmd.Parameters.AddWithValue("@PageNumber", page);
                     cmd.Parameters.AddWithValue("@PageSize", limit);
@@ -354,7 +352,7 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            brands.Add(new Brands
+                            brandList.Add(new Brands
                             {
                                 BrandId = (int)reader["BrandId"],
                                 BrandName = reader["BrandName"].ToString()!,
@@ -363,15 +361,15 @@ namespace FarmaDiDataAccess.Repositories
                             });
                         }
                     }
-                    var returnedValue = Convert.ToInt32(cmd.Parameters["@TotalRecords"].Value);
+
                     if (totalRecordsParam.Value != DBNull.Value)
                     {
                         totalRecords = Convert.ToInt32(totalRecordsParam.Value);
                     }
-                    response.Data = (brands, totalRecords);
+
+                    response.Data = (brandList, totalRecords);
                     response.OperationStatusCode = 0;
                 }
-
             }
             catch (SqlException ex)
             {
@@ -389,4 +387,4 @@ namespace FarmaDiDataAccess.Repositories
             return response;
         }
     }
-}
+} 

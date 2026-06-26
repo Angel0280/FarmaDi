@@ -12,5 +12,6 @@ namespace FarmaDiDataAccess.Interfaces
     {
         Task<RepositoryResponse<IEnumerable<Inventory>>> GetAllAsync();
         Task<RepositoryResponse<Inventory>> GetByIdAsync(int id);
+        Task<RepositoryResponse<InventoryDashboard>> GetDashboardAsync(int page, int limit, int? categoryId, string? estado, int? brandId, int? supplierId, DateTime? fechaCorte);
     }
 }

@@ -11,7 +11,7 @@ namespace FarmaDiCore.Entities
         public int SaleId { get; set; }
         public string ClientName { get; set; }
         public int UserId  { get; set; }
-        public DateOnly RegisteredDate { get; set; }
+        public DateTime RegisteredDate { get; set; }
         public decimal SubTotal { get; set; }
         public decimal Discount { get; set; }
         public decimal Total { get; set; }

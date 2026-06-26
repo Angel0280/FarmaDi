@@ -16,6 +16,8 @@ namespace FarmaDiBusiness.DTOs.ProductDto
         [StringLength(100, MinimumLength = 3, ErrorMessage = "El nombre génerico del producto debe contener entre 3 a 100 caracteres ")]
         public string? GenericName { get; set; }
         [Required]
+        public string? ConcentrationValue { get; set; }
+        [Required]
         [Range(1, int.MaxValue)]
         public int CategoryId { get; set; }
         [Required]

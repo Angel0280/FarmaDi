@@ -1,9 +1,7 @@
 ﻿using FarmaDiBusiness.DTOs;
 using FarmaDiBusiness.DTOs.ProductDto;
 using FarmaDiBusiness.Interfaces;
-using FarmaDiBusiness.Services;
 using FarmaDiCore.Common;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
@@ -13,146 +11,125 @@ namespace FarmaDiApi.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
+        private readonly IProductService _productService;
 
-        private readonly IProductService _ProductService;
-        
-
-        //Constructor del controlador
-        public ProductsController(IProductService product)
+        public ProductsController(IProductService productService)
         {
-            _ProductService = product;
-           
+            _productService = productService;
         }
 
         [HttpPost]
         public async Task<IActionResult> Add([FromBody] AddProductDto addProductDto)
         {
-
-
-            var serviceResponse = await _ProductService.AddAsync(addProductDto);
+            var serviceResponse = await _productService.AddAsync(addProductDto);
 
             if (serviceResponse.IsSuccess)
             {
-                var productDto = new ProductDto  
+                var productDto = new ProductDto
                 {
                     ProductId = serviceResponse.Data!.ProductId,
-                    GenericName = serviceResponse.Data!.GenericName,
-                    TradeName = serviceResponse!.Data.TradeName,
-                    CategoryId = serviceResponse!.Data.CategoryId,
-                  
-                    PresentationId = serviceResponse!.Data.PresentationId,
-                    ConcentrationId = serviceResponse!.Data.ConcentrationId,
-                    SupplierId = serviceResponse!.Data.SupplierId,
-                    BrandId = serviceResponse!.Data.BrandId,
-                   
-                    IsActive = serviceResponse.Data!.IsActive,
-
+                    GenericName = serviceResponse.Data.GenericName,
+                    TradeName = serviceResponse.Data.TradeName,
+                    CategoryId = serviceResponse.Data.CategoryId,
+                    PresentationId = serviceResponse.Data.PresentationId,
+                    ConcentrationId = serviceResponse.Data.ConcentrationId,
+                    ConcentrationValue = serviceResponse.Data.ConcentrationValue, // NUEVO: Mapeo de la característica
+                    SupplierId = serviceResponse.Data.SupplierId,
+                    BrandId = serviceResponse.Data.BrandId,
+                    IsActive = serviceResponse.Data.IsActive,
                 };
+
                 return CreatedAtAction(
                     nameof(GetById),
-                    new { Id = productDto.ProductId },
+                    new { id = productDto.ProductId },
                     productDto);
-
-
             }
-            var unSuccessfulResponse = new UnsuccessfulResponseDto();
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.Conflict:
-                    unSuccessfulResponse.Code = "409";
-                    unSuccessfulResponse.Message = "El nombre del producto ya existe";
-                    unSuccessfulResponse.Details = new { info = "No se puede duplicar el nombre del producto" };
+                    unsuccessfulResponse.Code = "409";
+                    unsuccessfulResponse.Message = "El nombre del producto ya existe";
+                    unsuccessfulResponse.Details = new { info = "No se puede duplicar el nombre del producto" };
+                    return Conflict(unsuccessfulResponse);
 
-                    return Conflict(unSuccessfulResponse);
-
-                    case MessageCodes.ErrorValidation:
-                    unSuccessfulResponse.Code = "400";
-                    unSuccessfulResponse.Message = "Ha ocurrio un error al registar el producto";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Uno o varios de los id no son válidos" };
-                    return BadRequest(unSuccessfulResponse);
+                case MessageCodes.ErrorValidation:
+                    unsuccessfulResponse.Code = "400";
+                    unsuccessfulResponse.Message = "Ha ocurrido un error al registrar el producto";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Uno o varios de los id no son válidos" };
+                    return BadRequest(unsuccessfulResponse);
 
                 default:
-                    unSuccessfulResponse.Code = "500";
-                    unSuccessfulResponse.Message = "Ocurrió un error inesperado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
-
-
-                    // aqui hice un cambio en badRequest 
-                    return StatusCode(500, unSuccessfulResponse);
-
-
-
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
-
 
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var serviceResponse = await _ProductService.GetAllAsync();
+            var serviceResponse = await _productService.GetAllAsync();
 
             if (serviceResponse.IsSuccess)
             {
-                var ProductsDtoCollection = serviceResponse.Data!.Select(c => new GetAllProductsDto
+                // CORREGIDO: Iterador cambiado a 'p' y agregado .ToList() para optimizar conteo
+                var productsDtoCollection = serviceResponse.Data!.Select(p => new GetAllProductsDto
                 {
-                    ProductId = c.ProductId,
-                    GenericName = c.GenericName,
-                    TradeName = c.TradeName,
-                    CategoryId = c.oCategory.CategoryId,
-                    CategoryName = c.oCategory.CategoryName,
-                    PresentationId = c.oPresentation.Id,
-                    PresentationName = c.oPresentation.Description,
-                    ConcentrationId = c.oconcentration.ConcentrationId,
-                    Porcentage = c.oconcentration.ConcentrationName,
-                    SupplierId = c.oSupplier.SupplierId,
-                    SupplierName = c.oSupplier.SupplierName,
-                    BrandId = c.obrand.BrandId,
-                    BrandName = c.obrand.BrandName,
-                    IsActive = c.IsActive
-                });
+                    ProductId = p.ProductId,
+                    GenericName = p.GenericName,
+                    TradeName = p.TradeName,
+                    CategoryId = p.oCategory.CategoryId,
+                    CategoryName = p.oCategory.CategoryName,
+                    PresentationId = p.oPresentation.Id,
+                    PresentationName = p.oPresentation.Description,
+                    ConcentrationId = p.oconcentration.ConcentrationId,
+                    Porcentage = p.oconcentration.Volume,
+                    ConcentrationValue = p.ConcentrationValue, // NUEVO: Mapeo de la característica
+                    SupplierId = p.oSupplier.SupplierId,
+                    SupplierName = p.oSupplier.SupplierName,
+                    BrandId = p.obrand.BrandId,
+                    BrandName = p.obrand.BrandName,
+                    IsActive = p.IsActive
+                }).ToList();
 
-                //preparamos la respuesta ApiResponse
                 var apiResponse = new ApiResponse<IEnumerable<GetAllProductsDto>>
                 {
-                    Data = ProductsDtoCollection,
+                    Data = productsDtoCollection,
                     Meta = new
                     {
-                        TotalAmount = ProductsDtoCollection.Count(),
+                        TotalAmount = productsDtoCollection.Count,
                         message = serviceResponse.Message
-
                     }
                 };
                 return Ok(apiResponse);
             }
 
             var unsuccessfulResponse = new UnsuccessfulResponseDto();
-
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NoData:
                     unsuccessfulResponse.Code = "200";
                     unsuccessfulResponse.Message = "No se encontraron registros";
                     unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
-
                     return Ok(unsuccessfulResponse);
 
                 default:
                     unsuccessfulResponse.Code = "500";
                     unsuccessfulResponse.Message = "Ocurrió un error inesperado";
                     unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
-
                     return StatusCode(500, unsuccessfulResponse);
             }
-
         }
-
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            if (id <= 0 || id == null)
+            if (id <= 0) // CORREGIDO: Removido 'id == null' por incompatibilidad con int primitivo
             {
-                var response = new UnsuccessfulResponseDto()
+                var response = new UnsuccessfulResponseDto
                 {
                     Code = "400",
                     Message = "Id proporcionado debe de ser mayor a 0",
@@ -160,145 +137,130 @@ namespace FarmaDiApi.Controllers
                 };
                 return BadRequest(response);
             }
-            var serviceResponse = await _ProductService.GetByIdAsync(id);
+
+            var serviceResponse = await _productService.GetByIdAsync(id);
 
             if (serviceResponse.IsSuccess)
             {
-                var productDto = new GetAllProductsDto()
+                var productDto = new GetAllProductsDto
                 {
                     ProductId = serviceResponse.Data!.ProductId,
-                    GenericName = serviceResponse.Data!.GenericName,
-                    TradeName = serviceResponse.Data!.TradeName,
-                    CategoryId = serviceResponse.Data!.oCategory.CategoryId,
+                    GenericName = serviceResponse.Data.GenericName,
+                    TradeName = serviceResponse.Data.TradeName,
+                    CategoryId = serviceResponse.Data.oCategory.CategoryId,
                     CategoryName = serviceResponse.Data.oCategory.CategoryName,
-                    PresentationId = serviceResponse.Data!.oPresentation.Id,
-                    PresentationName = serviceResponse.Data!.oPresentation.Description,
-                    ConcentrationId = serviceResponse.Data!.oconcentration.ConcentrationId,
-                    Porcentage = serviceResponse.Data!.oconcentration.ConcentrationName,
-                    SupplierId = serviceResponse.Data!.oSupplier.SupplierId,
-                    SupplierName = serviceResponse.Data!.oSupplier.SupplierName,
-                    BrandId = serviceResponse.Data!.obrand.BrandId,
-                    BrandName = serviceResponse.Data!.obrand.BrandName,
+                    PresentationId = serviceResponse.Data.oPresentation.Id,
+                    PresentationName = serviceResponse.Data.oPresentation.Description,
+                    ConcentrationId = serviceResponse.Data.oconcentration.ConcentrationId,
+                    Porcentage = serviceResponse.Data.oconcentration.Volume,
+                    ConcentrationValue = serviceResponse.Data.ConcentrationValue, // NUEVO: Mapeo de la característica
+                    SupplierId = serviceResponse.Data.oSupplier.SupplierId,
+                    SupplierName = serviceResponse.Data.oSupplier.SupplierName,
+                    BrandId = serviceResponse.Data.obrand.BrandId,
+                    BrandName = serviceResponse.Data.obrand.BrandName,
                     IsActive = serviceResponse.Data.IsActive,
                 };
 
                 return Ok(productDto);
             }
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NotFound:
-                    var unsuccessfulResponse = new UnsuccessfulResponseDto()
-                    {
-                        Code = "404",
-                        Message = "No se encontró un producto asociado al Id proporcionado",
-                        Details = new { info = serviceResponse.Message ?? "No se encontró el recurso solicitado" }
-                    };
-
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = "No se encontró un producto asociado al Id proporcionado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "No se encontró el recurso solicitado" };
                     return NotFound(unsuccessfulResponse);
 
                 default:
-                    unsuccessfulResponse = new UnsuccessfulResponseDto()
-                    {
-                        Code = "500",
-                        Message = "Ocurrió un error",
-                        Details = new { info = serviceResponse.Message ?? "Error interno no esperado" }
-                    };
-
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno no esperado" };
                     return StatusCode(500, unsuccessfulResponse);
-
             }
         }
-
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto dataProduct)
         {
-
-           
-            var serviceResponse = await _ProductService.UpdateAsync(id, dataProduct);
+            var serviceResponse = await _productService.UpdateAsync(id, dataProduct);
 
             if (serviceResponse.IsSuccess)
             {
-                // Mapeo de la categoría recibida a formato CategoryDto
-                var updatedproduct = new ProductDto
+                var updatedProduct = new ProductDto
                 {
                     ProductId = serviceResponse.Data!.ProductId,
-                    GenericName = serviceResponse.Data!.GenericName,
-                    TradeName = serviceResponse.Data!.TradeName,
-                    CategoryId = serviceResponse.Data!.oCategory.CategoryId,
-                    PresentationId = serviceResponse.Data!.oPresentation.Id,
-                    ConcentrationId = serviceResponse.Data!.oconcentration.ConcentrationId,
-                  
-                    SupplierId = serviceResponse.Data!.oSupplier.SupplierId,
-                 
-                    BrandId = serviceResponse.Data!.obrand.BrandId,
-               
+                    GenericName = serviceResponse.Data.GenericName,
+                    TradeName = serviceResponse.Data.TradeName,
+                    CategoryId = serviceResponse.Data.CategoryId,
+                    PresentationId = serviceResponse.Data.ConcentrationId,
+                    ConcentrationId = serviceResponse.Data.ConcentrationId,
+                    ConcentrationValue = serviceResponse.Data.ConcentrationValue, // NUEVO: Mapeo de la característica
+                    SupplierId = serviceResponse.Data.SupplierId,
+                    BrandId = serviceResponse.Data.BrandId,
                     IsActive = serviceResponse.Data.IsActive,
                 };
 
-                // En este punto se enviará una respuesta exitosa de la solicitud (registro actualizado)
-                return Ok(updatedproduct);
+                return Ok(updatedProduct);
             }
 
-            var unSuccessfulResponse = new UnsuccessfulResponseDto();
-
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.ErrorValidation:
-                    unSuccessfulResponse.Code = "400";
-                    unSuccessfulResponse.Message = "No encontrado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Recurso no encontrado" };
-                    return NotFound(unSuccessfulResponse);
+                    // CORREGIDO: Sincronización de códigos semánticos para error de recurso no encontrado (404)
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = "No encontrado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Recurso no encontrado" };
+                    return NotFound(unsuccessfulResponse);
 
                 case MessageCodes.Conflict:
-                    unSuccessfulResponse.Code = "409";
-                    unSuccessfulResponse.Message = "El registro no pudo guardarse por un conflicto";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Hubo conflicto en la actualización" };
-                    return Conflict(unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "409";
+                    unsuccessfulResponse.Message = "El registro no pudo guardarse por un conflicto";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Hubo conflicto en la actualización" };
+                    return Conflict(unsuccessfulResponse);
 
                 default:
-                    unSuccessfulResponse.Code = "500";
-                    unSuccessfulResponse.Message = "Ocurrió un error inesperado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
-                    return StatusCode(500, unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
-
-
 
         [HttpGet("byname/{name}")]
         public async Task<IActionResult> GetByName(string name)
         {
-            var unSuccessfulResponse = new UnsuccessfulResponseDto();
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             if (name.IsNullOrEmpty())
             {
-                unSuccessfulResponse.Code = "400";
-                unSuccessfulResponse.Message = "El dato proporcionado no es válido";
-                unSuccessfulResponse.Details = new { Error = "El nombre no puede ser nulo o vacío" };
-
-                return BadRequest(unSuccessfulResponse);
-
+                unsuccessfulResponse.Code = "400";
+                unsuccessfulResponse.Message = "El dato proporcionado no es válido";
+                unsuccessfulResponse.Details = new { Error = "El nombre no puede ser nulo o vacío" };
+                return BadRequest(unsuccessfulResponse);
             }
 
-            var serviceResponse = await _ProductService.GetByNameAsync(name);
+            var serviceResponse = await _productService.GetByNameAsync(name);
 
             if (serviceResponse.IsSuccess)
             {
-                var productDto = new GetAllProductsDto()
+                var productDto = new GetAllProductsDto
                 {
                     ProductId = serviceResponse.Data!.ProductId,
-                    GenericName = serviceResponse.Data!.GenericName,
-                    TradeName = serviceResponse.Data!.TradeName,
-                    CategoryId = serviceResponse.Data!.oCategory.CategoryId,
+                    GenericName = serviceResponse.Data.GenericName,
+                    TradeName = serviceResponse.Data.TradeName,
+                    CategoryId = serviceResponse.Data.oCategory.CategoryId,
                     CategoryName = serviceResponse.Data.oCategory.CategoryName,
-                    PresentationId = serviceResponse.Data!.oPresentation.Id,
-                    PresentationName = serviceResponse.Data!.oPresentation.Description,
-                    ConcentrationId = serviceResponse.Data!.oconcentration.ConcentrationId,
-                    Porcentage = serviceResponse.Data!.oconcentration.ConcentrationName,
-                    SupplierId = serviceResponse.Data!.oSupplier.SupplierId,
-                    SupplierName = serviceResponse.Data!.oSupplier.SupplierName,
-                    BrandId = serviceResponse.Data!.obrand.BrandId,
-                    BrandName = serviceResponse.Data!.obrand.BrandName,
+                    PresentationId = serviceResponse.Data.oPresentation.Id,
+                    PresentationName = serviceResponse.Data.oPresentation.Description,
+                    ConcentrationId = serviceResponse.Data.oconcentration.ConcentrationId,
+                    Porcentage = serviceResponse.Data.oconcentration.Volume,
+                    ConcentrationValue = serviceResponse.Data.ConcentrationValue, // NUEVO: Mapeo de la característica
+                    SupplierId = serviceResponse.Data.oSupplier.SupplierId,
+                    SupplierName = serviceResponse.Data.oSupplier.SupplierName,
+                    BrandId = serviceResponse.Data.obrand.BrandId,
+                    BrandName = serviceResponse.Data.obrand.BrandName,
                     IsActive = serviceResponse.Data.IsActive,
                 };
 
@@ -308,65 +270,55 @@ namespace FarmaDiApi.Controllers
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NotFound:
-                    unSuccessfulResponse.Code = "404";
-                    unSuccessfulResponse.Message = serviceResponse.Message ?? "Producto no encontrada";
-                    unSuccessfulResponse.Details = new { Error = "El recurso solicitado no está disponible en el servidor" };
-                    return NotFound(unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = serviceResponse.Message ?? "Producto no encontrado";
+                    unsuccessfulResponse.Details = new { Error = "El recurso solicitado no está disponible en el servidor" };
+                    return NotFound(unsuccessfulResponse);
 
                 default:
-                    unSuccessfulResponse.Code = "500";
-                    unSuccessfulResponse.Message = serviceResponse.Message ?? "Ocurrió un error inesperado";
-
-                    return StatusCode(500, unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = serviceResponse.Message ?? "Ocurrió un error inesperado";
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
 
-
-
-
         [HttpPatch("{id}/state")]
-        public async Task<IActionResult> SetStateAsync(int id, [FromQuery] bool state)
+        public async Task<IActionResult> SetState(int id, [FromQuery] bool state)
         {
-            var serviceResponse = await _ProductService.SetStateAsync(id, state);
+            var serviceResponse = await _productService.SetStateAsync(id, state);
 
             if (serviceResponse.IsSuccess)
             {
-             
                 return Ok(new
                 {
                     ProductId = serviceResponse.Data!.ProductId,
-                    GenericName = serviceResponse.Data!.GenericName,
-                    TradeName = serviceResponse.Data!.TradeName,
-                    CategoryId = serviceResponse.Data!.CategoryId,
-                    PresentatioId = serviceResponse.Data!.PresentationId,
-                    ConcentrationId = serviceResponse.Data!.ConcentrationId,
-
-                    SupplierId = serviceResponse.Data!.SupplierId,
-
-                    BrandId = serviceResponse.Data!.BrandId,
-
-
+                    GenericName = serviceResponse.Data.GenericName,
+                    TradeName = serviceResponse.Data.TradeName,
+                    CategoryId = serviceResponse.Data.CategoryId,
+                    PresentationId = serviceResponse.Data.PresentationId,
+                    ConcentrationId = serviceResponse.Data.ConcentrationId,
+                    ConcentrationValue = serviceResponse.Data.ConcentrationValue, // NUEVO: Mapeo de la característica
+                    SupplierId = serviceResponse.Data.SupplierId,
+                    BrandId = serviceResponse.Data.BrandId,
                     IsActive = serviceResponse.Data.IsActive,
                     Message = serviceResponse.Message
                 });
             }
 
-            var unSuccessfulResponse = new UnsuccessfulResponseDto();
-
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.NotFound:
-                    unSuccessfulResponse.Code = "404";
-                    unSuccessfulResponse.Message = "No se encontró un producto con el Id proporcionado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Recurso no encontrado" };
-                    return NotFound(unSuccessfulResponse);
-
+                    unsuccessfulResponse.Code = "404";
+                    unsuccessfulResponse.Message = "No se encontró un producto con el Id proporcionado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Recurso no encontrado" };
+                    return NotFound(unsuccessfulResponse);
 
                 default:
-                    unSuccessfulResponse.Code = "500";
-                    unSuccessfulResponse.Message = "Ocurrió un error inesperado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
-                    return StatusCode(500, unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
+                    return StatusCode(500, unsuccessfulResponse);
             }
         }
 
@@ -375,37 +327,38 @@ namespace FarmaDiApi.Controllers
         {
             if (page <= 0) page = 1;
             if (limit <= 0) limit = 10;
-            if (limit > 100) limit = 100; 
+            if (limit > 100) limit = 100;
 
-            var serviceResponse = await _ProductService.GetProductsPagedAsync(page, limit);
+            var serviceResponse = await _productService.GetProductsPagedAsync(page, limit);
 
             if (serviceResponse.IsSuccess)
             {
                 var (products, totalCount) = serviceResponse.Data;
 
-                var ProductsDtoCollection = products.Select(c => new GetAllProductsDto
+                var productsDtoCollection = products.Select(p => new GetAllProductsDto
                 {
-                    ProductId = c.ProductId,
-                    GenericName = c.GenericName,
-                    TradeName = c.TradeName,
-                    CategoryId = c.oCategory.CategoryId,
-                    CategoryName = c.oCategory.CategoryName,
-                    PresentationId = c.oPresentation.Id,
-                    PresentationName = c.oPresentation.Description,
-                    ConcentrationId = c.oconcentration.ConcentrationId,
-                    Porcentage = c.oconcentration.ConcentrationName,
-                    SupplierId = c.oSupplier.SupplierId,
-                    SupplierName = c.oSupplier.SupplierName,
-                    BrandId = c.obrand.BrandId,
-                    BrandName = c.obrand.BrandName,
-                    IsActive = c.IsActive
+                    ProductId = p.ProductId,
+                    GenericName = p.GenericName,
+                    TradeName = p.TradeName,
+                    CategoryId = p.oCategory.CategoryId,
+                    CategoryName = p.oCategory.CategoryName,
+                    PresentationId = p.oPresentation.Id,
+                    PresentationName = p.oPresentation.Description,
+                    ConcentrationId = p.oconcentration.ConcentrationId,
+                    Porcentage = p.oconcentration.Volume,
+                    ConcentrationValue = p.ConcentrationValue, // NUEVO: Mapeo de la característica
+                    SupplierId = p.oSupplier.SupplierId,
+                    SupplierName = p.oSupplier.SupplierName,
+                    BrandId = p.obrand.BrandId,
+                    BrandName = p.obrand.BrandName,
+                    IsActive = p.IsActive
                 }).ToList();
 
                 int totalPages = (int)Math.Ceiling(totalCount / (double)limit);
 
                 var apiResponse = new ApiResponse<IEnumerable<GetAllProductsDto>>
                 {
-                    Data = ProductsDtoCollection,
+                    Data = productsDtoCollection,
                     Meta = new GetPagedDto
                     {
                         TotalItems = totalCount,
@@ -418,9 +371,9 @@ namespace FarmaDiApi.Controllers
             }
 
             var unsuccessfulResponse = new UnsuccessfulResponseDto();
-
             switch (serviceResponse.MessageCode)
             {
+                case MessageCodes.NotFound:
                 case MessageCodes.NoData:
                     unsuccessfulResponse.Code = "200";
                     unsuccessfulResponse.Message = "No se encontraron registros";

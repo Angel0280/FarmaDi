@@ -3,27 +3,22 @@ using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
-    public class PresentationRepository: IPresentationRepository
+    public class PresentationRepository : IPresentationRepository
     {
         private readonly string _connectionString;
+
         public PresentationRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")!;
         }
 
-        // aqui agregamos una presentación a la base de datos
         public async Task<RepositoryResponse<Presentations>> AddAsync(Presentations presentation)
         {
-            var response = new Presentations();
+            var presentationResult = new Presentations();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -35,35 +30,27 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@PresentationDescription", presentation.Description);
                     cmd.Parameters.AddWithValue("@Quantity", presentation.Quantity);
                     cmd.Parameters.AddWithValue("@UnitMeasure", presentation.UnitMeasure);
-                    //cmd.Parameters.AddWithValue("@IsActive", presentation.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.Id = (int)reader["PresentationId"];
-                            response.Description = reader["PresentationDescription"].ToString();
-                            response.Quantity = reader["quantity"].ToString()!;
-                            response.UnitMeasure = reader["UnitMeasure"].ToString()!;
-                          //  response.IsActive = (bool)reader["Isactive"];
-
-
+                            presentationResult.Id = (int)reader["PresentationId"];
+                            presentationResult.Description = reader["PresentationDescription"].ToString()!;
+                            presentationResult.Quantity = reader["quantity"].ToString()!;
+                            presentationResult.UnitMeasure = reader["UnitMeasure"].ToString()!;
+                            presentationResult.IsActive = true;
                         }
                     }
 
-
-                    // capturamos el código que viene del procedimiento 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
                     return new RepositoryResponse<Presentations>
                     {
-                        Data = response,
+                        Data = presentationResult,
                         OperationStatusCode = returnedValue
-
                     };
                 }
-
-
             }
             catch (SqlException ex)
             {
@@ -72,19 +59,25 @@ namespace FarmaDiDataAccess.Repositories
                     Data = null,
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
-
                 };
-
+            }
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Presentations>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
             }
         }
 
         public async Task<RepositoryResponse<IEnumerable<Presentations>>> GetAllAsync()
         {
-            var category = new List<Presentations>();
+            var presentationList = new List<Presentations>(); // CORREGIDO: Antes se llamaba 'category'
             var response = new RepositoryResponse<IEnumerable<Presentations>>();
             try
             {
-                // establecemos la conexion con la base de datos
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
@@ -96,31 +89,28 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            category.Add(new Presentations
+                            presentationList.Add(new Presentations
                             {
                                 Id = (int)reader["PresentationId"],
-                                Description = reader["PresentationDescription"].ToString(),
+                                Description = reader["PresentationDescription"].ToString()!,
                                 Quantity = reader["quantity"].ToString()!,
                                 UnitMeasure = reader["UnitMeasure"].ToString()!,
                                 IsActive = (bool)reader["Isactive"]
-
                             });
                         }
                     }
-                    //Capturando el valor que retorna  el procedimiento almacenado 
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = category;
+                    response.Data = presentationList;
                     response.OperationStatusCode = returnedValue;
-
                 }
             }
             catch (SqlException ex)
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
             }
-
             catch (Exception ex)
             {
                 return new RepositoryResponse<IEnumerable<Presentations>>
@@ -135,7 +125,7 @@ namespace FarmaDiDataAccess.Repositories
 
         public async Task<RepositoryResponse<Presentations>> GetByIdAsync(int id)
         {
-            var response = new Presentations();
+            var presentationResult = new Presentations();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -146,26 +136,22 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@PresentationId", id);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.Id = (int)reader["PresentationId"];
-                            response.Description = reader["PresentationDescription"].ToString();
-                            response.Quantity = reader["quantity"].ToString()!;
-                            response.UnitMeasure = reader["UnitMeasure"].ToString()!;
-                            response.IsActive = (bool)reader["Isactive"];
-
+                            presentationResult.Id = (int)reader["PresentationId"];
+                            presentationResult.Description = reader["PresentationDescription"].ToString()!;
+                            presentationResult.Quantity = reader["quantity"].ToString()!;
+                            presentationResult.UnitMeasure = reader["UnitMeasure"].ToString()!;
+                            presentationResult.IsActive = (bool)reader["Isactive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-
                     return new RepositoryResponse<Presentations>
                     {
-                        Data = response,
+                        Data = presentationResult,
                         OperationStatusCode = returnedValue
                     };
                 }
@@ -178,12 +164,17 @@ namespace FarmaDiDataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Presentations>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
         }
-
-
 
         public async Task<RepositoryResponse<Presentations>> UpdateAsync(int id, Presentations presentation)
         {
@@ -201,32 +192,26 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@IsActive", presentation.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
-                    Presentations Update = null;
+                    Presentations updatedPresentation = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Update = new Presentations
+                            updatedPresentation = new Presentations
                             {
                                 Id = (int)reader["PresentationId"],
-                                Description = reader["PresentationDescription"].ToString(),
+                                Description = reader["PresentationDescription"].ToString()!,
                                 Quantity = reader["quantity"].ToString()!,
                                 UnitMeasure = reader["UnitMeasure"].ToString()!,
                                 IsActive = (bool)reader["Isactive"]
                             };
                         }
                     }
-                    // var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-                    // response.Data = brandUpdate;
-                    // response.OperationStatusCode = returnedValue;
 
                     return new RepositoryResponse<Presentations>
                     {
-                        Data = Update,
-                        OperationStatusCode = 0,
-
-
+                        Data = updatedPresentation,
+                        OperationStatusCode = 0
                     };
                 }
             }
@@ -235,93 +220,9 @@ namespace FarmaDiDataAccess.Repositories
                 return new RepositoryResponse<Presentations>
                 {
                     Data = null,
-                    OperationStatusCode = -1,
-                    Message = ex.Message,
-
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
                 };
-            }
-        }
-
-        public async Task<RepositoryResponse<Presentations>> GetByNameAsync(string name)
-        {
-            var presentation = new Presentations();
-            var response = new RepositoryResponse<Presentations>();
-
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    await connection.OpenAsync();
-                    SqlCommand cmd = new SqlCommand("USP_GetCategoryByName", connection);
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@CategoryName", name);
-                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
-
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            presentation.Id = (int)reader["PresentationId"];
-                            presentation.Description = reader["PresentationDescription"].ToString();
-                            presentation.Quantity = reader["quantity"].ToString()!;
-                            presentation.UnitMeasure = reader["UnitMeasure"].ToString()!;
-                            presentation.IsActive = (bool)reader["Isactive"];
-                        }
-                    }
-
-                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = presentation;
-                    response.OperationStatusCode = returnedValue;
-
-                    return response;
-                }
-            }
-            catch (SqlException ex)
-            {
-                response.Data = null;
-                response.OperationStatusCode = ex.Number;
-                return response;
-            }
-        }
-
-
-        public async Task<RepositoryResponse<Presentations>> SetStateAsync(int id, bool state)
-        {
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(_connectionString))
-                {
-                    await connection.OpenAsync();
-
-                    SqlCommand cmd = new SqlCommand("USP_DeactivatePresentation", connection);
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@PresentationId", id);
-                    cmd.Parameters.AddWithValue("@IsActive", state);
-
-                    Presentations Updated = null;
-
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            Updated = new Presentations
-                            {
-                                Id = (int)reader["PresentationId"],
-                                Description = reader["PresentationDescription"].ToString(),
-                                Quantity = reader["quantity"].ToString()!,
-                                UnitMeasure = reader["UnitMeasure"].ToString()!,
-                                IsActive = (bool)reader["Isactive"]
-                            };
-                        }
-                    }
-
-                    return new RepositoryResponse<Presentations>
-                    {
-                        Data = Updated,
-                        OperationStatusCode = Updated != null ? 0 : 1
-                    };
-                }
             }
             catch (Exception ex)
             {
@@ -334,7 +235,109 @@ namespace FarmaDiDataAccess.Repositories
             }
         }
 
+        public async Task<RepositoryResponse<Presentations>> GetByNameAsync(string name)
+        {
+            var presentationResult = new Presentations();
+            var response = new RepositoryResponse<Presentations>();
 
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    // CORREGIDO: Apunta al SP de presentaciones, no de categorías
+                    SqlCommand cmd = new SqlCommand("USP_GetPresentationByName", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@PresentationDescription", name); // CORREGIDO: Parámetro correcto
+                    cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            presentationResult.Id = (int)reader["PresentationId"];
+                            presentationResult.Description = reader["PresentationDescription"].ToString()!;
+                            presentationResult.Quantity = reader["quantity"].ToString()!;
+                            presentationResult.UnitMeasure = reader["UnitMeasure"].ToString()!;
+                            presentationResult.IsActive = (bool)reader["Isactive"];
+                        }
+                    }
+
+                    var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
+                    response.Data = presentationResult;
+                    response.OperationStatusCode = returnedValue;
+                    return response;
+                }
+            }
+            catch (SqlException ex)
+            {
+                response.Data = null;
+                response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
+                return response;
+            }
+        }
+
+        public async Task<RepositoryResponse<Presentations>> SetStateAsync(int id, bool state)
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
+                    SqlCommand cmd = new SqlCommand("USP_DeactivatePresentation", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@PresentationId", id);
+                    cmd.Parameters.AddWithValue("@IsActive", state);
+
+                    Presentations updatedPresentation = null;
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            updatedPresentation = new Presentations
+                            {
+                                Id = (int)reader["PresentationId"],
+                                Description = reader["PresentationDescription"].ToString()!,
+                                Quantity = reader["quantity"].ToString()!,
+                                UnitMeasure = reader["UnitMeasure"].ToString()!,
+                                IsActive = (bool)reader["Isactive"]
+                            };
+                        }
+                    }
+
+                    return new RepositoryResponse<Presentations>
+                    {
+                        Data = updatedPresentation,
+                        OperationStatusCode = updatedPresentation != null ? 0 : 1
+                    };
+                }
+            }
+            catch (SqlException ex)
+            {
+                return new RepositoryResponse<Presentations>
+                {
+                    Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
+            }
+            catch (Exception ex)
+            {
+                return new RepositoryResponse<Presentations>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
+        }
     }
 }

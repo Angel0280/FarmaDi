@@ -42,6 +42,7 @@ namespace FarmaDiDataAccess.Repositories
                             {
                                 Id = (int)reader["StockId"],
                                 BatchId = new ProductBatches {Id =(int)reader["BatchId"], BatchNumer = reader["BatchNumber"].ToString() },
+                                ProductId = (int)reader["ProductId"],
                                 AvailableQuantity = (int)reader["AvailableQuantity"],
                                 
                             });
@@ -93,6 +94,7 @@ namespace FarmaDiDataAccess.Repositories
                         {
                             response.Id = (int)reader["StockId"];
                             response.BatchId =new ProductBatches { Id = (int)reader["BatchId"], BatchNumer = reader["BatchNumber"].ToString() };
+                            response.ProductId = (int)reader["ProductId"];
                             response.AvailableQuantity =(int) reader["AvailableQuantity"];
                          
                         }

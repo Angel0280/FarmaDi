@@ -1,11 +1,8 @@
 ﻿using FarmaDiBusiness.DTOs;
 using FarmaDiBusiness.DTOs.UsersDto;
 using FarmaDiBusiness.Interfaces;
-using FarmaDiBusiness.Services;
 using FarmaDiCore.Common;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 
 namespace FarmaDiApi.Controllers
 {
@@ -15,21 +12,20 @@ namespace FarmaDiApi.Controllers
     {
         private readonly IAuthService _authService;
 
-        //Constructor del controlador
-        public AuthController(IAuthService users)
+        public AuthController(IAuthService authService)
         {
-            _authService = users;
+            _authService = authService;
         }
 
         [HttpPost("Register")]
         public async Task<IActionResult> Register([FromBody] AddUserDto newuser)
         {
             var serviceResponse = await _authService.RegisterAsync(newuser);
+
             if (serviceResponse.IsSuccess)
             {
                 var userDto = new AddUserDto
                 {
-
                     UserName = serviceResponse.Data!.UserName,
                     UserLastName = serviceResponse.Data!.UserLastName,
                     Mail = serviceResponse.Data!.Mail,
@@ -41,35 +37,30 @@ namespace FarmaDiApi.Controllers
                     new { id = serviceResponse.Data!.UserId },
                     userDto);
             }
-            var unSuccessfulResponse = new UnsuccessfulResponseDto();
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto(); // CORREGIDO: Casing camelCase
             switch (serviceResponse.MessageCode)
             {
                 case MessageCodes.ErrorValidation:
-                    unSuccessfulResponse.Code = "400";
-                    unSuccessfulResponse.Message = "Los datos proporcionados no son válidos";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error de validación de datos" };
-                    return BadRequest(unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "400";
+                    unsuccessfulResponse.Message = "Los datos proporcionados no son válidos";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error de validación de datos" };
+                    return BadRequest(unsuccessfulResponse);
 
                 case MessageCodes.Conflict:
-                    unSuccessfulResponse.Code = "409";
-                    unSuccessfulResponse.Message = "El nombre de usuario ya existe";
-                    unSuccessfulResponse.Details = new { info = "No se puede duplicar el nombre de marca" };
-
-                    return Conflict(unSuccessfulResponse);
+                    unsuccessfulResponse.Code = "409";
+                    unsuccessfulResponse.Message = "El nombre de usuario o correo ya existe";
+                    unsuccessfulResponse.Details = new { info = "No se puede duplicar la información de una cuenta de usuario" }; // CORREGIDO: Texto de "marcas" removido
+                    return Conflict(unsuccessfulResponse);
 
                 default:
-                    unSuccessfulResponse.Code = "500";
-                    unSuccessfulResponse.Message = "Ocurrió un error inesperado";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
-
-                    return BadRequest(unSuccessfulResponse);
-
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "Error interno inesperado" };
+                    // CORREGIDO: Antes retornaba BadRequest forzado para un error interno 500
+                    return StatusCode(500, unsuccessfulResponse);
             }
-
-
         }
-
-       
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto loginRequest)
@@ -79,24 +70,23 @@ namespace FarmaDiApi.Controllers
             if (serviceResponse.IsSuccess)
             {
                 return Ok(serviceResponse.Data);
-
             }
 
-            var unSuccessfulResponse = new UnsuccessfulResponseDto();
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
             switch (serviceResponse.MessageCode)
             {
-                case MessageCodes.Unauthorized:
-                    unSuccessfulResponse.Code = "401";
-                    unSuccessfulResponse.Message = "Credenciales inválidas";
-                    unSuccessfulResponse.Details = new { info = serviceResponse.Message ?? "El nombre de usuario o la contraseña son incorrectos" };
-                    return Unauthorized(unSuccessfulResponse);
-                default:
-                    unSuccessfulResponse.Code = "500";
-                    unSuccessfulResponse.Message = serviceResponse.Message ?? "Ocurrio un error inesperado";
-                 
-                    return StatusCode(500, unSuccessfulResponse);
-            }
+                case MessageCodes.NotFound:       // NUEVO: Captura el estado seguro si el username no existe en la BD
+                case MessageCodes.Unauthorized:   // Captura si la contraseña es incorrecta
+                    unsuccessfulResponse.Code = "401";
+                    unsuccessfulResponse.Message = "Credenciales inválidas";
+                    unsuccessfulResponse.Details = new { info = serviceResponse.Message ?? "El nombre de usuario o la contraseña son incorrectos" };
+                    return Unauthorized(unsuccessfulResponse); // HTTP 401 impecable
 
+                default:
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = serviceResponse.Message ?? "Ocurrió un error inesperado";
+                    return StatusCode(500, unsuccessfulResponse);
+            }
         }
     }
 }

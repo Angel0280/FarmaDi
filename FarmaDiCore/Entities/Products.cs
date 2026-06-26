@@ -11,6 +11,7 @@ namespace FarmaDiCore.Entities
         public int ProductId { get; set; }
         public string? GenericName { get; set; }
         public string? TradeName { get; set; }
+        public string ConcentrationValue { get; set; }
         public int CategoryId { get; set; }
         public Categories oCategory { get; set; } 
         public int PresentationId { get; set; }

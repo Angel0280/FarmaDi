@@ -329,5 +329,63 @@ namespace FarmaDiApi.Controllers
                     return StatusCode(500, unSuccessfulResponse);
             }
         }
+
+
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int limit = 10)
+        {
+            if (page <= 0) page = 1;
+            if (limit <= 0) limit = 10;
+            if (limit > 100) limit = 100;
+
+            var serviceResponse = await _SuppliersService.GetSuppliersPagedAsync(page, limit);
+
+            if (serviceResponse.IsSuccess)
+            {
+                var (suppliers, totalCount) = serviceResponse.Data;
+                var suppliersCollection = suppliers.Select(b => new GetAllSupplierDto
+                {
+                    SupplierId = b.SupplierId,
+                    SupplierName = b.SupplierName,
+                    RNC = b.RNC,
+                    SupplierPhone = b.SupplierPhone,
+                    Mail = b.Mail,
+                    SupplierAddress = b.SupplierAddress,
+                    IsActive = b.IsActive
+                }).ToList();
+
+                int totalPages = (int)Math.Ceiling(totalCount / (double)limit);
+
+                var apiResponse = new ApiResponse<IEnumerable<GetAllSupplierDto>>
+                {
+                    Data = suppliersCollection,
+                    Meta = new GetPagedDto
+                    {
+                        TotalItems = totalCount,
+                        TotalPages = totalPages,
+                        CurrentPage = page,
+                        ItemsPerPage = limit
+                    }
+                };
+                return Ok(apiResponse);
+            }
+
+            var unsuccessfulResponse = new UnsuccessfulResponseDto();
+            switch (serviceResponse.MessageCode)
+            {
+                case MessageCodes.NotFound:
+                case MessageCodes.NoData:
+                    unsuccessfulResponse.Code = "200";
+                    unsuccessfulResponse.Message = "No se encontraron registros";
+                    unsuccessfulResponse.Details = new { info = "Temporalmente no hay registros en la BD" };
+                    return Ok(unsuccessfulResponse);
+
+                default:
+                    unsuccessfulResponse.Code = "500";
+                    unsuccessfulResponse.Message = "Ocurrió un error inesperado";
+                    unsuccessfulResponse.Details = new { info = "Error interno en la aplicación" };
+                    return StatusCode(500, unsuccessfulResponse);
+            }
+        }
     }
 }

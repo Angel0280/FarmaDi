@@ -17,8 +17,10 @@ namespace FarmaDiBusiness.DTOs.ProductDto
        
         public int CategoryId { get; set; }
         public string CategoryName { get; set; }
-     
-       
+        public string ConcentrationValue { get; set; }
+
+
+
         public int PresentationId { get; set; }
         public string PresentationName { get; set; }
    

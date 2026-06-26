@@ -1,31 +1,24 @@
-﻿using Azure;
-using FarmaDiCore.Common;
+﻿using FarmaDiCore.Common;
 using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiDataAccess.Repositories
 {
-    public class ProductsRepository:IProductsRepository
+    public class ProductsRepository : IProductsRepository
     {
-
-
         private readonly string _connectionString;
+
         public ProductsRepository(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection")!;
         }
 
-        public async Task<RepositoryResponse<Products>> AddAsync(Products Product)
+        public async Task<RepositoryResponse<Products>> AddAsync(Products product)
         {
-            var response = new Products();
+            var productResult = new Products(); // CORREGIDO: Renombrado semántico
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -34,47 +27,40 @@ namespace FarmaDiDataAccess.Repositories
                     SqlCommand cmd = new SqlCommand("USP_AddProduct", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
 
-                    cmd.Parameters.AddWithValue("@ProductTradeName", Product.TradeName);
-                    cmd.Parameters.AddWithValue("@ProductGenericName", Product.GenericName);
-                    cmd.Parameters.AddWithValue("@CategoryId", Product.CategoryId);
-                    cmd.Parameters.AddWithValue("@PresentationId", Product.PresentationId);
-                    cmd.Parameters.AddWithValue("@ConcentrationId", Product.ConcentrationId);
-                    cmd.Parameters.AddWithValue("@SupplierId", Product.SupplierId);
-                    cmd.Parameters.AddWithValue("@BrandId", Product.BrandId);
-                    //cmd.Parameters.AddWithValue("@IsActive", Product.IsActive);
+                    cmd.Parameters.AddWithValue("@ProductTradeName", product.TradeName);
+                    cmd.Parameters.AddWithValue("@ProductGenericName", product.GenericName);
+                    cmd.Parameters.AddWithValue("@CategoryId", product.CategoryId);
+                    cmd.Parameters.AddWithValue("@PresentationId", product.PresentationId);
+                    cmd.Parameters.AddWithValue("@ConcentrationId", product.ConcentrationId);
+                    cmd.Parameters.AddWithValue("@ConcentrationValue", product.ConcentrationValue); // NUEVO
+                    cmd.Parameters.AddWithValue("@SupplierId", product.SupplierId);
+                    cmd.Parameters.AddWithValue("@BrandId", product.BrandId);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.ProductId = (int)reader["ProductId"];
-                            response.TradeName = reader["ProductTradeName"].ToString()!;
-                            response.GenericName = reader["ProductGenericName"].ToString();
-                            response.CategoryId =(int) reader["CategoryId"];
-                           
-                            response.PresentationId =(int) reader["PresentationId"];
-                            response.ConcentrationId = (int)reader["ConcentrationId"];
-                            response.SupplierId = (int)reader["SupplierId"];
-                            response.BrandId = (int)reader["BrandId"];
-                            
-                            response.IsActive = (bool)reader["IsActive"];
-
+                            productResult.ProductId = (int)reader["ProductId"];
+                            productResult.TradeName = reader["ProductTradeName"].ToString()!;
+                            productResult.GenericName = reader["ProductGenericName"].ToString()!;
+                            productResult.CategoryId = (int)reader["CategoryId"];
+                            productResult.PresentationId = (int)reader["PresentationId"];
+                            productResult.ConcentrationId = (int)reader["ConcentrationId"];
+                            productResult.ConcentrationValue = reader["ConcentrationValue"].ToString(); // NUEVO
+                            productResult.SupplierId = (int)reader["SupplierId"];
+                            productResult.BrandId = (int)reader["BrandId"];
+                            productResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
-
-                    // capturamos el código que viene del procedimiento 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
                     return new RepositoryResponse<Products>
                     {
-                        Data = response,
+                        Data = productResult,
                         OperationStatusCode = returnedValue
-
                     };
                 }
-
-
             }
             catch (SqlException ex)
             {
@@ -83,21 +69,25 @@ namespace FarmaDiDataAccess.Repositories
                     Data = null,
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
-
                 };
-
+            }
+            catch (Exception ex) // CORREGIDO: Blindaje contra fallos de casteo en runtime
+            {
+                return new RepositoryResponse<Products>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
             }
         }
 
-
-   
         public async Task<RepositoryResponse<IEnumerable<Products>>> GetAllAsync()
         {
-            var Products = new List<Products>();
+            var productList = new List<Products>(); // CORREGIDO: Nomenclatura camelCase
             var response = new RepositoryResponse<IEnumerable<Products>>();
             try
             {
-                // establecemos la conexion con la base de datos
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
@@ -109,34 +99,33 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            Products.Add(new Products
+                            productList.Add(new Products
                             {
                                 ProductId = (int)reader["ProductId"],
                                 GenericName = reader["ProductGenericName"].ToString()!,
-                                TradeName = reader["ProductTradeName"].ToString(),
-                                oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString()},  
-                                oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString()},
-                                oconcentration  = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], ConcentrationName = reader["Porcentage"].ToString() },
-                                oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"],SupplierName = reader["SupplierName"].ToString() } ,
-                                obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString() },
+                                TradeName = reader["ProductTradeName"].ToString()!,
+                                oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString()! },
+                                oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString()! },
+                                oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], Volume = reader["Porcentage"].ToString()! },
+                                ConcentrationValue = reader["ConcentrationValue"].ToString(), // NUEVO
+                                oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString()! },
+                                obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString()! },
                                 IsActive = (bool)reader["Isactive"]
                             });
                         }
                     }
-                    //Capturando el valor que retorna  el procedimiento almacenado 
+
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = Products;
+                    response.Data = productList;
                     response.OperationStatusCode = returnedValue;
-
                 }
             }
             catch (SqlException ex)
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
             }
-
             catch (Exception ex)
             {
                 return new RepositoryResponse<IEnumerable<Products>>
@@ -149,10 +138,9 @@ namespace FarmaDiDataAccess.Repositories
             return response;
         }
 
-
         public async Task<RepositoryResponse<Products>> GetByIdAsync(int id)
         {
-            var response = new Products();
+            var productResult = new Products();
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -163,30 +151,27 @@ namespace FarmaDiDataAccess.Repositories
                     cmd.Parameters.AddWithValue("@ProductId", id);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            response.ProductId = (int)reader["ProductId"];
-                            response.GenericName = reader["ProductGenericName"].ToString()!;
-                            response.TradeName = reader["ProductTradeName"].ToString();
-                            response.oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString() };
-                            response.oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString() };
-                            response.oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], ConcentrationName = reader["Porcentage"].ToString() };
-                            response.oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString() };
-                            response.obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString() };
-                            response.IsActive = (bool)reader["IsActive"];
-
+                            productResult.ProductId = (int)reader["ProductId"];
+                            productResult.GenericName = reader["ProductGenericName"].ToString()!;
+                            productResult.TradeName = reader["ProductTradeName"].ToString()!;
+                            productResult.oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString()! };
+                            productResult.oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString()! };
+                            productResult.oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], Volume = reader["Porcentage"].ToString()! };
+                            productResult.ConcentrationValue = reader["ConcentrationValue"].ToString(); // NUEVO
+                            productResult.oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString()! };
+                            productResult.obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString()! };
+                            productResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-
                     return new RepositoryResponse<Products>
                     {
-                        Data = response,
+                        Data = productResult,
                         OperationStatusCode = returnedValue
                     };
                 }
@@ -199,13 +184,19 @@ namespace FarmaDiDataAccess.Repositories
                     OperationStatusCode = ex.Number,
                     Message = ex.Message
                 };
-
             }
-
+            catch (Exception ex) // CORREGIDO: Bloque catch global de resguardo
+            {
+                return new RepositoryResponse<Products>
+                {
+                    Data = null,
+                    OperationStatusCode = -1,
+                    Message = ex.Message
+                };
+            }
         }
 
-
-        public async Task<RepositoryResponse<Products>> UpdateAsync(int id, Products Products)
+        public async Task<RepositoryResponse<Products>> UpdateAsync(int id, Products product)
         {
             try
             {
@@ -215,49 +206,42 @@ namespace FarmaDiDataAccess.Repositories
                     SqlCommand cmd = new SqlCommand("USP_UpdateProduct", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ProductId", id);
-                    cmd.Parameters.AddWithValue("@ProductGenericName", Products.GenericName);
-                    cmd.Parameters.AddWithValue("@ProductTradeName", Products.TradeName);
-                    cmd.Parameters.AddWithValue("@CategoryId", Products.CategoryId);
-            
-                    cmd.Parameters.AddWithValue("@PresentationId", Products.PresentationId);
-                    cmd.Parameters.AddWithValue("@ConcentrationId", Products.ConcentrationId);
-                    cmd.Parameters.AddWithValue("@SupplierId", Products.SupplierId);
-                    cmd.Parameters.AddWithValue("@BrandId", Products.BrandId);
-                 
-                    cmd.Parameters.AddWithValue("@IsActive", Products.IsActive);
+                    cmd.Parameters.AddWithValue("@ProductGenericName", product.GenericName);
+                    cmd.Parameters.AddWithValue("@ProductTradeName", product.TradeName);
+                    cmd.Parameters.AddWithValue("@CategoryId", product.CategoryId);
+                    cmd.Parameters.AddWithValue("@PresentationId", product.PresentationId);
+                    cmd.Parameters.AddWithValue("@ConcentrationId", product.ConcentrationId);
+                    cmd.Parameters.AddWithValue("@ConcentrationValue", product.ConcentrationValue); // NUEVO
+                    cmd.Parameters.AddWithValue("@SupplierId", product.SupplierId);
+                    cmd.Parameters.AddWithValue("@BrandId", product.BrandId);
+                    cmd.Parameters.AddWithValue("@IsActive", product.IsActive);
                     cmd.Parameters.Add("@ReturnValue", SqlDbType.Int).Direction = ParameterDirection.ReturnValue;
 
-
-                     Products ProductUpdate = null;
+                    Products productUpdate = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            ProductUpdate = new Products
+                            productUpdate = new Products
                             {
                                 ProductId = (int)reader["ProductId"],
                                 GenericName = reader["ProductGenericName"].ToString()!,
-                                TradeName = reader["ProductTradeName"].ToString(),
-                                oCategory = new Categories { CategoryId = (int)reader["CategoryId"] },
-                                oPresentation = new Presentations { Id = (int)reader["PresentationId"] } ,
-                                oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"] },
-                                oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"] },
-                                obrand = new Brands { BrandId = (int)reader["BrandId"] },
+                                TradeName = reader["ProductTradeName"].ToString()!,
+                                CategoryId = (int)reader["CategoryId"],
+                                PresentationId = (int)reader["PresentationId"],
+                                ConcentrationId = (int)reader["ConcentrationId"],
+                                ConcentrationValue = reader["ConcentrationValue"].ToString(), // NUEVO
+                                SupplierId = (int)reader["SupplierId"],
+                                BrandId = (int)reader["BrandId"],
                                 IsActive = (bool)reader["IsActive"],
-
                             };
                         }
                     }
-                    // var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-                    // response.Data = ProductUpdate;
-                    // response.OperationStatusCode = returnedValue;
 
                     return new RepositoryResponse<Products>
                     {
-                        Data = ProductUpdate,
-                        OperationStatusCode = 0,
-
-
+                        Data = productUpdate,
+                        OperationStatusCode = 0
                     };
                 }
             }
@@ -266,20 +250,25 @@ namespace FarmaDiDataAccess.Repositories
                 return new RepositoryResponse<Products>
                 {
                     Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
+            }
+            catch (Exception ex) // CORREGIDO: Bloque catch global de resguardo
+            {
+                return new RepositoryResponse<Products>
+                {
+                    Data = null,
                     OperationStatusCode = -1,
-                    Message = ex.Message,
-
+                    Message = ex.Message
                 };
             }
         }
 
-
-
         public async Task<RepositoryResponse<Products>> GetByNameAsync(string name)
         {
-            var Product = new Products();
+            var productResult = new Products();
             var response = new RepositoryResponse<Products>();
-
             try
             {
                 using (SqlConnection connection = new SqlConnection(_connectionString))
@@ -294,24 +283,22 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         if (await reader.ReadAsync())
                         {
-
-                            Product.ProductId = (int)reader["ProductId"];
-                            Product.GenericName = reader["ProductGenericName"].ToString()!;
-                            Product.TradeName = reader["ProductTradeName"].ToString();
-                            Product.oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString() };
-                            Product.oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString() };
-                            Product.oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], ConcentrationName = reader["Porcentage"].ToString() };
-                            Product.oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString() };
-                            Product.obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString() };
-                            Product.IsActive = (bool)reader["IsActive"];
+                            productResult.ProductId = (int)reader["ProductId"];
+                            productResult.GenericName = reader["ProductGenericName"].ToString()!;
+                            productResult.TradeName = reader["ProductTradeName"].ToString()!;
+                            productResult.oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString()! };
+                            productResult.oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString()! };
+                            productResult.oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], Volume = reader["Porcentage"].ToString()! };
+                            productResult.ConcentrationValue = reader["ConcentrationValue"].ToString(); // NUEVO
+                            productResult.oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString()! };
+                            productResult.obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString()! };
+                            productResult.IsActive = (bool)reader["IsActive"];
                         }
                     }
 
                     var returnedValue = Convert.ToInt32(cmd.Parameters["@ReturnValue"].Value);
-
-                    response.Data = Product;
+                    response.Data = productResult;
                     response.OperationStatusCode = returnedValue;
-
                     return response;
                 }
             }
@@ -319,10 +306,17 @@ namespace FarmaDiDataAccess.Repositories
             {
                 response.Data = null;
                 response.OperationStatusCode = ex.Number;
+                response.Message = ex.Message;
+                return response;
+            }
+            catch (Exception ex) // CORREGIDO: Bloque catch global de resguardo
+            {
+                response.Data = null;
+                response.OperationStatusCode = -1;
+                response.Message = ex.Message;
                 return response;
             }
         }
-
 
         public async Task<RepositoryResponse<Products>> SetStateAsync(int id, bool state)
         {
@@ -331,30 +325,27 @@ namespace FarmaDiDataAccess.Repositories
                 using (SqlConnection connection = new SqlConnection(_connectionString))
                 {
                     await connection.OpenAsync();
-
                     SqlCommand cmd = new SqlCommand("UPS_UpdateProductStatus", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@ProductId", id);
                     cmd.Parameters.AddWithValue("@IsActive", state);
 
-                    Products Updated = null;
-
+                    Products updatedProduct = null;
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Updated = new Products
+                            updatedProduct = new Products
                             {
                                 ProductId = (int)reader["ProductId"],
-                                GenericName = reader["ProductGenericName"].ToString(),
-                                TradeName = reader["ProductTradeName"].ToString(),
-                                CategoryId =(int) reader["CategoryId"],
-                               
-                                PresentationId = (int) reader["PresentationId"],
-                                ConcentrationId = (int) reader["ConcentrationId"],
-                                SupplierId = (int) reader["SupplierId"],
-                                BrandId = (int) reader["BrandId"],
-
+                                GenericName = reader["ProductGenericName"].ToString()!,
+                                TradeName = reader["ProductTradeName"].ToString()!,
+                                CategoryId = (int)reader["CategoryId"],
+                                PresentationId = (int)reader["PresentationId"],
+                                ConcentrationId = (int)reader["ConcentrationId"],
+                                ConcentrationValue = reader["ConcentrationValue"].ToString(), // NUEVO
+                                SupplierId = (int)reader["SupplierId"],
+                                BrandId = (int)reader["BrandId"],
                                 IsActive = (bool)reader["Isactive"]
                             };
                         }
@@ -362,10 +353,19 @@ namespace FarmaDiDataAccess.Repositories
 
                     return new RepositoryResponse<Products>
                     {
-                        Data = Updated,
-                        OperationStatusCode = Updated != null ? 0 : 1
+                        Data = updatedProduct,
+                        OperationStatusCode = updatedProduct != null ? 0 : 1
                     };
                 }
+            }
+            catch (SqlException ex) // CORREGIDO: Captura específica de código de motor SQL
+            {
+                return new RepositoryResponse<Products>
+                {
+                    Data = null,
+                    OperationStatusCode = ex.Number,
+                    Message = ex.Message
+                };
             }
             catch (Exception ex)
             {
@@ -380,7 +380,7 @@ namespace FarmaDiDataAccess.Repositories
 
         public async Task<RepositoryResponse<(IEnumerable<Products> Items, int TotalCount)>> GetProductsPagedAsync(int page, int limit)
         {
-            var products = new List<Products>();
+            var productList = new List<Products>();
             var response = new RepositoryResponse<(IEnumerable<Products> Items, int TotalCount)>();
             int totalRecords = 0;
 
@@ -392,7 +392,6 @@ namespace FarmaDiDataAccess.Repositories
                     SqlCommand cmd = new SqlCommand("USP_GetProductsPaged", connection);
                     cmd.CommandType = CommandType.StoredProcedure;
 
-                    // Parámetros de entrada
                     cmd.Parameters.AddWithValue("@PageNumber", page);
                     cmd.Parameters.AddWithValue("@PageSize", limit);
 
@@ -405,17 +404,17 @@ namespace FarmaDiDataAccess.Repositories
                     {
                         while (await reader.ReadAsync())
                         {
-                            // Exactamente el mismo mapeo que ya tienes en USP_GetAllProducts
-                            products.Add(new Products
+                            productList.Add(new Products
                             {
                                 ProductId = (int)reader["ProductId"],
                                 GenericName = reader["ProductGenericName"].ToString()!,
-                                TradeName = reader["ProductTradeName"].ToString(),
-                                oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString() },
-                                oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString() },
-                                oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], ConcentrationName = reader["Porcentage"].ToString() },
-                                oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString() },
-                                obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString() },
+                                TradeName = reader["ProductTradeName"].ToString()!,
+                                oCategory = new Categories { CategoryId = (int)reader["CategoryId"], CategoryName = reader["CategoryName"].ToString()! },
+                                oPresentation = new Presentations { Id = (int)reader["PresentationId"], Description = reader["PresentationDescription"].ToString()! },
+                                oconcentration = new Concentrations { ConcentrationId = (int)reader["ConcentrationId"], Volume = reader["Porcentage"].ToString()! },
+                                ConcentrationValue = reader["ConcentrationValue"].ToString(), // NUEVO
+                                oSupplier = new Suppliers { SupplierId = (int)reader["SupplierId"], SupplierName = reader["SupplierName"].ToString()! },
+                                obrand = new Brands { BrandId = (int)reader["BrandId"], BrandName = reader["BrandName"].ToString()! },
                                 IsActive = (bool)reader["IsActive"]
                             });
                         }
@@ -428,7 +427,7 @@ namespace FarmaDiDataAccess.Repositories
                         totalRecords = Convert.ToInt32(totalRecordsParam.Value);
                     }
 
-                    response.Data = (products, totalRecords);
+                    response.Data = (productList, totalRecords);
                     response.OperationStatusCode = returnedValue;
                 }
             }
@@ -446,7 +445,6 @@ namespace FarmaDiDataAccess.Repositories
             }
 
             return response;
-
         }
     }
 }

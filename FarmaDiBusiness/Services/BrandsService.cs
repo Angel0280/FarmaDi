@@ -3,54 +3,41 @@ using FarmaDiBusiness.Interfaces;
 using FarmaDiCore.Common;
 using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
-using FarmaDiDataAccess.Repositories;
 using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiBusiness.Services
 {
     public class BrandsService : IBrandsService
     {
-
-        // Implementacion del metodo GetAllAsync para obtener todas las marcas
         private readonly IBrandsRepository _brandRepository;
+
         public BrandsService(IBrandsRepository brandRepository)
         {
             _brandRepository = brandRepository;
         }
 
-
-        public async Task<ServiceResponse<Brands>> AddAsync(AddBrandDto newbrand)
+        public async Task<ServiceResponse<Brands>> AddAsync(AddBrandDto newBrand)
         {
-
             try
             {
-                //validar si existe registro (una marca) con nombre similar al que se desea crear
-                var existing = await _brandRepository.GetByNameAsync(newbrand.BrandName);
+                // Validar si existe una marca con el mismo nombre
+                var existing = await _brandRepository.GetByNameAsync(newBrand.BrandName);
 
-                if (existing.Data!.BrandId != 0 && !existing.Data.BrandName.IsNullOrEmpty())
+                if (existing?.Data != null && existing.Data.BrandId != 0 && !existing.Data.BrandName.IsNullOrEmpty())
                 {
                     return new ServiceResponse<Brands>
                     {
                         Data = null,
-                        IsSuccess = false, ///.//
+                        IsSuccess = false,
                         MessageCode = MessageCodes.Conflict,
                         Message = "Existe un registro con el nombre proporcionado"
-
                     };
-
                 }
 
-
-                var brand = new Brands()
+                var brand = new Brands
                 {
-                    BrandName = newbrand.BrandName,
-                    Description = newbrand.BrandDescription,
-
+                    BrandName = newBrand.BrandName,
+                    Description = newBrand.BrandDescription,
                 };
 
                 var result = await _brandRepository.AddAsync(brand);
@@ -62,9 +49,6 @@ namespace FarmaDiBusiness.Services
                     MessageCode = MessageCodes.Success,
                     Message = "Marca registrada correctamente"
                 };
-
-
-
             }
             catch (Exception)
             {
@@ -73,58 +57,68 @@ namespace FarmaDiBusiness.Services
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = "Ocurrió un error inesperado",
+                    Message = "Ocurrió un error inesperado"
                 };
             }
         }
 
-
         public async Task<ServiceResponse<IEnumerable<Brands>>> GetAllAsync()
         {
-            var result = await _brandRepository.GetAllAsync();
-
-            if (result.OperationStatusCode == 0)
+            try
             {
-                return new ServiceResponse<IEnumerable<Brands>>()
+                var result = await _brandRepository.GetAllAsync();
+
+                if (result.OperationStatusCode == 0)
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Operacion exitosa"
-                };
-
-
-            }
-            switch (result.OperationStatusCode)
-            {
-                case 50009:
                     return new ServiceResponse<IEnumerable<Brands>>
                     {
                         Data = result.Data,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.NoData,
-                        Message = "No se encontraron registros"
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
                     };
+                }
 
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        return new ServiceResponse<IEnumerable<Brands>>
+                        {
+                            Data = result.Data,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.NoData,
+                            Message = "No se encontraron registros"
+                        };
 
-                default:
-                    return new ServiceResponse<IEnumerable<Brands>>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.NoData,
-                        Message = "Ocurrió un error inesperado"
-                    };
-
+                    default:
+                        return new ServiceResponse<IEnumerable<Brands>>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase, // CORREGIDO: Antes NoData
+                            Message = "Ocurrió un error inesperado"
+                        };
+                }
             }
-
+            catch (Exception)
+            {
+                return new ServiceResponse<IEnumerable<Brands>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al recuperar los datos"
+                };
+            }
         }
 
         public async Task<ServiceResponse<Brands>> GetByIdAsync(int id)
         {
-            var result = await _brandRepository.GetByIdAsync(id);
             try
             {
+                // CORREGIDO: Movido dentro del try-catch de forma segura
+                var result = await _brandRepository.GetByIdAsync(id);
+
                 if (result.OperationStatusCode == 0)
                 {
                     return new ServiceResponse<Brands>
@@ -135,9 +129,10 @@ namespace FarmaDiBusiness.Services
                         Message = result.Message ?? "Operación exitosa"
                     };
                 }
+
                 switch (result.OperationStatusCode)
                 {
-                    case 50009: // Ejemplo: código para no encontrado
+                    case 50009:
                         return new ServiceResponse<Brands>
                         {
                             Data = null,
@@ -162,20 +157,18 @@ namespace FarmaDiBusiness.Services
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = result.Message ?? "Ocurrió un error inesperado"
-
+                    Message = "Ocurrió un error inesperado"
                 };
             }
         }
 
-        public async Task<ServiceResponse<Brands>> UpdateAsync(int id, UpdateBrandDto brands)
+        public async Task<ServiceResponse<Brands>> UpdateAsync(int id, UpdateBrandDto brandDto)
         {
-
             try
             {
-
+                // Validar existencia por ID de manera segura
                 var existingId = await _brandRepository.GetByIdAsync(id);
-                if (existingId.Data!.BrandId == 0 && existingId.Data.BrandName.IsNullOrEmpty())
+                if (existingId?.Data == null || (existingId.Data.BrandId == 0 && existingId.Data.BrandName.IsNullOrEmpty()))
                 {
                     return new ServiceResponse<Brands>
                     {
@@ -183,31 +176,27 @@ namespace FarmaDiBusiness.Services
                         IsSuccess = false,
                         MessageCode = MessageCodes.ErrorValidation,
                         Message = "No existe una marca asociada al Id proporcionado"
-
                     };
-
-
                 }
 
-                //validar que el nombre enviado para la marca no coincida con un  nombre existente
-                var existingName = await _brandRepository.GetByNameAsync(brands.BrandName);
-                if (existingName.Data!.BrandName != null && existingName.Data.BrandId != id)
+                // Validar que el nuevo nombre no genere conflicto con otra marca distinta
+                var existingName = await _brandRepository.GetByNameAsync(brandDto.BrandName);
+                if (existingName?.Data != null && existingName.Data.BrandName != null && existingName.Data.BrandId != id)
                 {
                     return new ServiceResponse<Brands>
                     {
                         Data = null,
                         IsSuccess = false,
                         MessageCode = MessageCodes.Conflict,
-                        Message = "ya existe una marca con el nombre proporcionado"
+                        Message = "Ya existe una marca con el nombre proporcionado"
                     };
                 }
 
-                var dataBrand = new Brands()
+                var dataBrand = new Brands
                 {
-                    BrandName = brands.BrandName,
-                    Description = brands.BrandDescription,
-                    IsActive = brands.IsActive,
-
+                    BrandName = brandDto.BrandName,
+                    Description = brandDto.BrandDescription,
+                    IsActive = brandDto.IsActive,
                 };
 
                 var result = await _brandRepository.UpdateAsync(id, dataBrand);
@@ -219,8 +208,6 @@ namespace FarmaDiBusiness.Services
                     MessageCode = MessageCodes.Success,
                     Message = "Marca actualizada correctamente"
                 };
-
-
             }
             catch (Exception)
             {
@@ -234,121 +221,154 @@ namespace FarmaDiBusiness.Services
             }
         }
 
-
         public async Task<ServiceResponse<Brands>> GetByNameAsync(string name)
         {
-            var result = await _brandRepository.GetByNameAsync(name);
-            if (result.OperationStatusCode == 0)
+            try
+            {
+                var result = await _brandRepository.GetByNameAsync(name);
+                if (result.OperationStatusCode == 0)
+                {
+                    return new ServiceResponse<Brands>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
+                    };
+                }
+
+                var messageCode = MessageCodes.Success;
+                var message = string.Empty;
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        messageCode = MessageCodes.NotFound;
+                        message = "No se encontró una marca que corresponda al nombre proporcionado";
+                        break;
+
+                    default:
+                        messageCode = MessageCodes.ErrorDataBase;
+                        message = "Error en la base de datos al obtener la marca.";
+                        break;
+                }
+
+                return new ServiceResponse<Brands>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = messageCode,
+                    Message = message
+                };
+            }
+            catch (Exception)
             {
                 return new ServiceResponse<Brands>
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Operación exitosa"
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al procesar la búsqueda por nombre"
                 };
             }
-
-            var messageCode = new MessageCodes();
-            var message = string.Empty;
-
-            switch (result.OperationStatusCode)
-            {
-                case 50009:
-                    messageCode = MessageCodes.NotFound;
-                    message = "No se encontró una marca que corresponda al nombre proporcionado";
-                    break;
-
-                default:
-                    messageCode = MessageCodes.ErrorDataBase;
-                    message = "Error en la base de datos al obtener la marca.";
-                    break;
-            }
-
-            // Retorno  para los casos de error o no encontrado
-            return new ServiceResponse<Brands>
-            {
-                Data = null,
-                IsSuccess = false,
-                MessageCode = messageCode,
-                Message = message
-            };
         }
-
-
-
 
         public async Task<ServiceResponse<Brands>> SetStateAsync(int id, bool state)
         {
-            var response = new ServiceResponse<Brands>();
-
-            // Validar que la marca exista
-            var existing = await _brandRepository.GetByIdAsync(id);
-            if (existing == null)
+            try
             {
-                response.Data = null;
-                response.IsSuccess = false;
-                response.MessageCode = MessageCodes.ErrorValidation;
-                response.Message = "La marca no existe";
+                var response = new ServiceResponse<Brands>();
+
+                // CORREGIDO: Validación de existencia real alineada al comportamiento del Repositorio
+                var existing = await _brandRepository.GetByIdAsync(id);
+                if (existing?.Data == null || existing.Data.BrandId == 0)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.MessageCode = MessageCodes.ErrorValidation;
+                    response.Message = "La marca no existe";
+                    return response;
+                }
+
+                var repoResponse = await _brandRepository.SetStateAsync(id, state);
+
+                if (repoResponse?.Data == null)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.MessageCode = MessageCodes.NotFound;
+                    response.Message = "No se pudo encontrar una marca que coincida con el id proporcionado";
+                    return response;
+                }
+
+                response.Data = repoResponse.Data;
+                response.IsSuccess = true;
+                response.MessageCode = MessageCodes.Success;
+                response.Message = state ? "Marca activada" : "Marca desactivada";
+
                 return response;
             }
-
-            // Llamar al repositorio para actualizar el estado
-            var repoResponse = await _brandRepository.SetStateAsync(id, state);
-
-            if (repoResponse.Data == null)
+            catch (Exception)
             {
-                response.Data = null;
-                response.IsSuccess = false;
-                response.MessageCode = MessageCodes.NotFound;
-                response.Message = "No se pudo encontrar una marca que coincida con el id proporcionado";
-                return response;
+                return new ServiceResponse<Brands>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al modificar el estado de la marca"
+                };
             }
-
-            // Construir la respuesta exitosa
-            response.Data = repoResponse.Data;
-            response.IsSuccess = true;
-            response.MessageCode = MessageCodes.Success;
-            response.Message = state ? "Marca activada" : "Marca desactivada";
-
-            return response;
         }
 
         public async Task<ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>> GetBrandsPagedAsync(int page, int limit)
         {
-            var result = await _brandRepository.GetBrandsPagedAsync(page, limit);
-            if (result.OperationStatusCode == 0)
+            try
             {
-                return new ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>()
+                var result = await _brandRepository.GetBrandsPagedAsync(page, limit);
+                if (result.OperationStatusCode == 0)
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Operación exitosa"
+                    return new ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
+                    };
+                }
+
+                var messageCode = MessageCodes.Success;
+                var message = string.Empty;
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        messageCode = MessageCodes.NotFound;
+                        message = "No se encontraron marcas para la página solicitada";
+                        break;
+                    default:
+                        messageCode = MessageCodes.ErrorDataBase;
+                        message = "Error en la base de datos al obtener las marcas.";
+                        break;
+                }
+
+                return new ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>
+                {
+                    Data = (new List<Brands>(), 0),
+                    IsSuccess = false,
+                    MessageCode = messageCode,
+                    Message = message
                 };
             }
-            var messageCode = new MessageCodes();
-            var message = string.Empty;
-            switch (result.OperationStatusCode)
+            catch (Exception)
             {
-                case 50009:
-                    messageCode = MessageCodes.NotFound;
-                    message = "No se encontraron marcas para la página solicitada";
-                    break;
-                default:
-                    messageCode = MessageCodes.ErrorDataBase;
-                    message = "Error en la base de datos al obtener las marcas.";
-                    break;
+                return new ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>
+                {
+                    Data = (new List<Brands>(), 0),
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al paginar los registros"
+                };
             }
-            return new ServiceResponse<(IEnumerable<Brands> Items, int TotalCount)>
-            {
-                Data = (null, 0),
-                IsSuccess = false,
-                MessageCode = messageCode,
-                Message = message
-            };
-
         }
     }
 }
-

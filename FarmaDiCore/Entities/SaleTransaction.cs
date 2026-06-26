@@ -9,6 +9,8 @@ namespace FarmaDiCore.Entities
     public class SaleTransaction
     {
         public Sale Sale { get; set; }
+        public Invoice InvoiceMaster { get; set; }
         public IEnumerable<SaleDetails> SaleDetailsList { get; set; }
+        public List<InvoiceDetails> InvoiceDetails { get; set; }
     }
 }

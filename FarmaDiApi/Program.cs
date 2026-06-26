@@ -1,3 +1,4 @@
+using FarmaDi.DataAccess.Repositories;
 using FarmaDiBusiness.Interfaces;
 using FarmaDiBusiness.Services;
 using FarmaDiDataAccess.Interfaces;
@@ -128,6 +129,13 @@ builder.Services.AddScoped<ISalesRepository, SalesRepository>();
 
 builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<IUsersRepository, UsersRepository>();
+
+builder.Services.AddScoped<IKPIDashboardService, KPIDashboardService>();
+builder.Services.AddScoped<IKPIDashboardRepository, DashboardRepository>();
+
+
+builder.Services.AddScoped<IConcentrationServices, ConcentrationServices>();
+builder.Services.AddScoped<IConcentrationRepository, ConcentrationRepository>();
 
 
 builder.Services.AddCors(options =>

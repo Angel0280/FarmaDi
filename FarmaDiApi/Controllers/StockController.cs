@@ -33,6 +33,7 @@ namespace FarmaDiApi.Controllers
                     StockId = c.Id,
                     BachtId = c.BatchId.Id,
                     BatchNumber = c.BatchId.BatchNumer,
+                    ProductId = c.ProductId,
                     AvailableQuantity = c.AvailableQuantity,
                    
                 });
@@ -95,6 +96,7 @@ namespace FarmaDiApi.Controllers
                     StockId = serviceResponse.Data!.Id,
                     BachtId = serviceResponse.Data.BatchId.Id,
                     BatchNumber = serviceResponse.Data.BatchId.BatchNumer,
+                    ProductId = serviceResponse.Data.ProductId,
                     AvailableQuantity = serviceResponse.Data.AvailableQuantity,
                 };
 

@@ -13,8 +13,9 @@ namespace FarmaDiBusiness.DTOs.ProductDto
         public string GenericName { get; set; }
         public string TradeName { get; set; }
         public int CategoryId { get; set; }
-       
-        
+        public string ConcentrationValue { get; set; }
+
+
         public int PresentationId { get; set; }
        
         public int ConcentrationId { get; set; }

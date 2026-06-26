@@ -3,67 +3,52 @@ using FarmaDiBusiness.Interfaces;
 using FarmaDiCore.Common;
 using FarmaDiCore.Entities;
 using FarmaDiDataAccess.Interfaces;
-using FarmaDiDataAccess.Repositories;
 using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FarmaDiBusiness.Services
 {
-    public class CategoriesService :ICategoriesService
+    public class CategoriesService : ICategoriesService
     {
-        // Implementacion del metodo GetAllAsync para obtener todas las categorias
         private readonly ICategoriesRepository _categoryRepository;
+
         public CategoriesService(ICategoriesRepository categoryRepository)
         {
             _categoryRepository = categoryRepository;
         }
 
-
-        public async Task<ServiceResponse<Categories>> AddAsync(AddCategoryDto newcategory)
+        public async Task<ServiceResponse<Categories>> AddAsync(AddCategoryDto newCategory)
         {
-
             try
             {
-                //validar si existe registro (categoria) con nombre similar al que se desea crear
-                var existing = await _categoryRepository.GetByNameAsync(newcategory.CategoryName);
+                // Validar si existe una categoría con el mismo nombre
+                var existing = await _categoryRepository.GetByNameAsync(newCategory.CategoryName);
 
-                if (existing.Data!.CategoryId != 0 && !existing.Data.CategoryName.IsNullOrEmpty())
+                if (existing?.Data != null && existing.Data.CategoryId != 0 && !existing.Data.CategoryName.IsNullOrEmpty())
                 {
                     return new ServiceResponse<Categories>
                     {
                         Data = null,
-                        IsSuccess = false, ///.//
+                        IsSuccess = false,
                         MessageCode = MessageCodes.Conflict,
                         Message = "Existe un registro con el nombre proporcionado"
-
                     };
-
                 }
 
-
-                var categories = new Categories()
+                var category = new Categories
                 {
-                    CategoryName = newcategory.CategoryName,
-                    CategoryDescription = newcategory.CategoryDescription,
-
+                    CategoryName = newCategory.CategoryName,
+                    CategoryDescription = newCategory.CategoryDescription,
                 };
 
-                var result = await _categoryRepository.AddAsync(categories);
+                var result = await _categoryRepository.AddAsync(category);
 
                 return new ServiceResponse<Categories>
                 {
                     Data = result.Data,
                     IsSuccess = true,
                     MessageCode = MessageCodes.Success,
-                    Message = "Categoria registrada correctamente"
+                    Message = "Categoría registrada correctamente"
                 };
-
-
-
             }
             catch (Exception)
             {
@@ -72,58 +57,68 @@ namespace FarmaDiBusiness.Services
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = "Ocurrió un error inesperado",
+                    Message = "Ocurrió un error inesperado"
                 };
             }
         }
 
-
         public async Task<ServiceResponse<IEnumerable<Categories>>> GetAllAsync()
         {
-            var result = await _categoryRepository.GetAllAsync();
-
-            if (result.OperationStatusCode == 0)
+            try
             {
-                return new ServiceResponse<IEnumerable<Categories>>()
+                var result = await _categoryRepository.GetAllAsync();
+
+                if (result.OperationStatusCode == 0)
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Operacion exitosa"
-                };
-
-
-            }
-            switch (result.OperationStatusCode)
-            {
-                case 50009:
                     return new ServiceResponse<IEnumerable<Categories>>
                     {
                         Data = result.Data,
                         IsSuccess = true,
-                        MessageCode = MessageCodes.NoData,
-                        Message = "No se encontraron registros"
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
                     };
+                }
 
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        return new ServiceResponse<IEnumerable<Categories>>
+                        {
+                            Data = result.Data,
+                            IsSuccess = false, // CORREGIDO: Consistencia de estado fallido
+                            MessageCode = MessageCodes.NoData,
+                            Message = "No se encontraron registros"
+                        };
 
-                default:
-                    return new ServiceResponse<IEnumerable<Categories>>
-                    {
-                        Data = null,
-                        IsSuccess = false,
-                        MessageCode = MessageCodes.NoData,
-                        Message = "Ocurrio un error inesperado"
-                    };
-
+                    default:
+                        return new ServiceResponse<IEnumerable<Categories>>
+                        {
+                            Data = null,
+                            IsSuccess = false,
+                            MessageCode = MessageCodes.ErrorDataBase, // CORREGIDO: Mapeo correcto de error de base de datos
+                            Message = "Ocurrió un error inesperado"
+                        };
+                }
             }
-
+            catch (Exception)
+            {
+                return new ServiceResponse<IEnumerable<Categories>>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al recuperar las categorías"
+                };
+            }
         }
 
         public async Task<ServiceResponse<Categories>> GetByIdAsync(int id)
         {
-            var result = await _categoryRepository.GetByIdAsync(id);
             try
             {
+                // CORREGIDO: Ejecución resguardada dentro del bloque try
+                var result = await _categoryRepository.GetByIdAsync(id);
+
                 if (result.OperationStatusCode == 0)
                 {
                     return new ServiceResponse<Categories>
@@ -134,15 +129,16 @@ namespace FarmaDiBusiness.Services
                         Message = result.Message ?? "Operación exitosa"
                     };
                 }
+
                 switch (result.OperationStatusCode)
                 {
-                    case 50009: // Ejemplo: código para no encontrado
+                    case 50009:
                         return new ServiceResponse<Categories>
                         {
                             Data = null,
                             IsSuccess = false,
                             MessageCode = MessageCodes.NotFound,
-                            Message = "La categoria no existe"
+                            Message = "La categoría no existe"
                         };
                     default:
                         return new ServiceResponse<Categories>
@@ -150,7 +146,7 @@ namespace FarmaDiBusiness.Services
                             Data = null,
                             IsSuccess = false,
                             MessageCode = MessageCodes.ErrorDataBase,
-                            Message = result.Message ?? "Ocurrió un error inesperado al obtener la categoria"
+                            Message = result.Message ?? "Error inesperado"
                         };
                 }
             }
@@ -161,65 +157,57 @@ namespace FarmaDiBusiness.Services
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = result.Message ?? "Ocurrió un error inesperado"
-
+                    Message = "Ocurrió un error inesperado"
                 };
             }
         }
 
-        public async Task<ServiceResponse<Categories>> UpdateAsync(int id, UpdateCategoryDto category)
+        public async Task<ServiceResponse<Categories>> UpdateAsync(int id, UpdateCategoryDto categoryDto)
         {
-
             try
             {
-
+                // Validar existencia de la categoría por ID de forma segura
                 var existingId = await _categoryRepository.GetByIdAsync(id);
-                if (existingId.Data!.CategoryId == 0 && existingId.Data.CategoryName.IsNullOrEmpty())
+                if (existingId?.Data == null || (existingId.Data.CategoryId == 0 && existingId.Data.CategoryName.IsNullOrEmpty()))
                 {
                     return new ServiceResponse<Categories>
                     {
                         Data = null,
                         IsSuccess = false,
                         MessageCode = MessageCodes.NotFound,
-                        Message = "No existe una categoria asociada al Id proporcionado"
-
+                        Message = "No existe una categoría asociada al Id proporcionado"
                     };
-
-
                 }
 
-                //validar que el nombre enviado para la marca no coincida con un  nombre existente
-                var existingName = await _categoryRepository.GetByNameAsync(category.Name);
-                if (existingName.Data!.CategoryName != null && existingName.Data.CategoryId != id)
+                // Validar que el nuevo nombre no cause conflicto con un registro de ID diferente
+                var existingName = await _categoryRepository.GetByNameAsync(categoryDto.Name);
+                if (existingName?.Data != null && existingName.Data.CategoryName != null && existingName.Data.CategoryId != id)
                 {
                     return new ServiceResponse<Categories>
                     {
                         Data = null,
                         IsSuccess = false,
                         MessageCode = MessageCodes.Conflict,
-                        Message = "ya existe una categoria con el nombre proporcionado"
+                        Message = "Ya existe una categoría con el nombre proporcionado"
                     };
                 }
 
-                var data = new Categories()
+                var categoryEntity = new Categories
                 {
-                    CategoryName = category.Name,
-                    CategoryDescription = category.Description,
-                    IsActive = category.IsActive,
-
+                    CategoryName = categoryDto.Name,
+                    CategoryDescription = categoryDto.Description,
+                    IsActive = categoryDto.IsActive,
                 };
 
-                var result = await _categoryRepository.UpdateAsync(id, data);
+                var result = await _categoryRepository.UpdateAsync(id, categoryEntity);
 
                 return new ServiceResponse<Categories>
                 {
                     Data = result.Data,
                     IsSuccess = true,
                     MessageCode = MessageCodes.Success,
-                    Message = "Categoria actualizada correctamente"
+                    Message = "Categoría actualizada correctamente"
                 };
-
-
             }
             catch (Exception)
             {
@@ -228,127 +216,161 @@ namespace FarmaDiBusiness.Services
                     Data = null,
                     IsSuccess = false,
                     MessageCode = MessageCodes.ErrorDataBase,
-                    Message = "Ocurrió un error inesperado al actualizar la categoria"
+                    Message = "Ocurrió un error inesperado al actualizar la categoría"
                 };
             }
         }
-
 
         public async Task<ServiceResponse<Categories>> GetByNameAsync(string name)
         {
-            var result = await _categoryRepository.GetByNameAsync(name);
-            if (result.OperationStatusCode == 0)
+            try
+            {
+                var result = await _categoryRepository.GetByNameAsync(name);
+                if (result.OperationStatusCode == 0)
+                {
+                    return new ServiceResponse<Categories>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
+                    };
+                }
+
+                var messageCode = MessageCodes.Success;
+                var message = string.Empty;
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        messageCode = MessageCodes.NotFound;
+                        message = "No se encontró una categoría que corresponda al nombre proporcionado";
+                        break;
+
+                    default:
+                        messageCode = MessageCodes.ErrorDataBase;
+                        message = "Error en la base de datos al obtener la categoría.";
+                        break;
+                }
+
+                return new ServiceResponse<Categories>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = messageCode,
+                    Message = message
+                };
+            }
+            catch (Exception)
             {
                 return new ServiceResponse<Categories>
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Operación exitosa"
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al procesar la consulta por nombre"
                 };
             }
-
-            var messageCode = new MessageCodes();
-            var message = string.Empty;
-
-            switch (result.OperationStatusCode)
-            {
-                case 50009:
-                    messageCode = MessageCodes.NotFound;
-                    message = "No se encontró una categoria que corresponda al nombre proporcionado";
-                    break;
-
-                default:
-                    messageCode = MessageCodes.ErrorDataBase;
-                    message = "Error en la base de datos al obtener la categoria.";
-                    break;
-            }
-
-            // Retorno  para los casos de error o no encontrado
-            return new ServiceResponse<Categories>
-            {
-                Data = null,
-                IsSuccess = false,
-                MessageCode = messageCode,
-                Message = message
-            };
         }
-
-
-
 
         public async Task<ServiceResponse<Categories>> SetStateAsync(int id, bool state)
         {
-            var response = new ServiceResponse<Categories>();
-
-            // Validar que la marca exista
-            var existingCategory = await _categoryRepository.GetByIdAsync(id);
-            if (existingCategory == null)
+            try
             {
-                response.Data = null;
-                response.IsSuccess = false;
-                response.MessageCode = MessageCodes.NotFound;
-                response.Message = "La categoria no existe";
+                var response = new ServiceResponse<Categories>();
+
+                // CORREGIDO: Evaluación de existencia alineada al comportamiento real del Repositorio
+                var existingCategory = await _categoryRepository.GetByIdAsync(id);
+                if (existingCategory?.Data == null || existingCategory.Data.CategoryId == 0)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.MessageCode = MessageCodes.NotFound;
+                    response.Message = "La categoría no existe";
+                    return response;
+                }
+
+                var repoResponse = await _categoryRepository.SetStateAsync(id, state);
+
+                if (repoResponse?.Data == null)
+                {
+                    response.Data = null;
+                    response.IsSuccess = false;
+                    response.MessageCode = MessageCodes.NotFound;
+                    response.Message = "No se pudo encontrar una categoría relacionada al id brindado";
+                    return response;
+                }
+
+                response.Data = repoResponse.Data;
+                response.IsSuccess = true;
+                response.MessageCode = MessageCodes.Success;
+                response.Message = state ? "Categoría activada" : "Categoría desactivada";
+
                 return response;
             }
-
-            // Llamar al repositorio para actualizar el estado
-            var repoResponse = await _categoryRepository.SetStateAsync(id, state);
-
-            if (repoResponse.Data == null)
+            catch (Exception)
             {
-                response.Data = null;
-                response.IsSuccess = false;
-                response.MessageCode = MessageCodes.NotFound;
-                response.Message = "No se pudo encontrar una categoria relacionada al id brindado";
-                return response;
+                return new ServiceResponse<Categories>
+                {
+                    Data = null,
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al modificar el estado de la categoría"
+                };
             }
-
-            // Construir la respuesta exitosa
-            response.Data = repoResponse.Data;
-            response.IsSuccess = true;
-            response.MessageCode = MessageCodes.Success;
-            response.Message = state ? "Categoria activada" : "Categoria desactivada";
-
-            return response;
         }
 
         public async Task<ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>> GetCategoriesPaged(int page, int limit)
         {
-            var result = await _categoryRepository.GetCategoriesPagedAsync(page, limit);
-            if (result.OperationStatusCode == 0)
+            try
             {
-                return new ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>()
+                var result = await _categoryRepository.GetCategoriesPagedAsync(page, limit);
+                if (result.OperationStatusCode == 0)
                 {
-                    Data = result.Data,
-                    IsSuccess = true,
-                    MessageCode = MessageCodes.Success,
-                    Message = "Operación exitosa"
+                    return new ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>
+                    {
+                        Data = result.Data,
+                        IsSuccess = true,
+                        MessageCode = MessageCodes.Success,
+                        Message = "Operación exitosa"
+                    };
+                }
+
+                var messageCode = MessageCodes.Success;
+                var message = string.Empty;
+
+                switch (result.OperationStatusCode)
+                {
+                    case 50009:
+                        messageCode = MessageCodes.NotFound;
+                        // CORREGIDO: Mensaje adecuado al contexto del módulo
+                        message = "No se encontraron categorías para la página solicitada";
+                        break;
+                    default:
+                        messageCode = MessageCodes.ErrorDataBase;
+                        // CORREGIDO: Mensaje adecuado al contexto del módulo
+                        message = "Error en la base de datos al obtener las categorías.";
+                        break;
+                }
+
+                return new ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>
+                {
+                    Data = (new List<Categories>(), 0),
+                    IsSuccess = false,
+                    MessageCode = messageCode,
+                    Message = message
                 };
             }
-            var messageCode = new MessageCodes();
-            var message = string.Empty;
-            switch (result.OperationStatusCode)
+            catch (Exception)
             {
-                case 50009:
-                    messageCode = MessageCodes.NotFound;
-                    message = "No se encontraron marcas para la página solicitada";
-                    break;
-                default:
-                    messageCode = MessageCodes.ErrorDataBase;
-                    message = "Error en la base de datos al obtener las marcas.";
-                    break;
+                return new ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>
+                {
+                    Data = (new List<Categories>(), 0),
+                    IsSuccess = false,
+                    MessageCode = MessageCodes.ErrorDataBase,
+                    Message = "Ocurrió un error inesperado al paginar los registros"
+                };
             }
-            return new ServiceResponse<(IEnumerable<Categories> Items, int TotalCount)>
-            {
-                Data = (null, 0),
-                IsSuccess = false,
-                MessageCode = messageCode,
-                Message = message
-            };
-
         }
     }
-
 }
-
